@@ -1,0 +1,135 @@
+# Niche definitions for niche-scout.
+# wiki: English Wikipedia article titles (redirects are resolved; missing titles are
+#       logged to data/raw/errors.csv and excluded, never counted as zero).
+# keywords: used for Google Trends AND YouTube search (2 per niche keeps YouTube
+#           search.list under the 100-calls/day free quota: 40 kw x 2 windows = 80).
+# subreddits: names without the r/ prefix.
+
+settings:
+  wiki_start: "2016-01-01"
+  trends_geo: ""            # "" = worldwide, "IN" = India
+  trends_anchor: "sudoku"   # mid-volume anchor shared by every Trends batch
+  youtube_window_days: 90
+  youtube_relevance_language: "en"
+  min_channel_subs_for_ratio: 1000  # tiny channels inflate views/sub ratios
+
+niches:
+  - id: perfume_layering
+    name: Perfume layering / scent stacking
+    wiki: [Perfume, Note (perfumery), Fragrance wheel, Eau de toilette]
+    keywords: [perfume layering, fragrance combinations]
+    subreddits: [fragrance, Colognes, FemFragLab]
+
+  - id: finance_charts
+    name: Finance data chart packs
+    wiki: [S&P 500, Compound interest, Inflation, NIFTY 50]
+    keywords: [stock market chart, S&P 500 chart]
+    subreddits: [investing, StockMarket, IndiaInvestments]
+
+  - id: night_sky
+    name: Night sky / astronomy
+    wiki: [Lunar phase, Meteor shower, Perseids, Full moon]
+    keywords: [meteor shower tonight, moon phase]
+    subreddits: [astronomy, space, telescopes]
+
+  - id: nostalgia_toys
+    name: Nostalgia toys
+    wiki: [Tamagotchi, Polly Pocket, Beanie Babies, Furby]
+    keywords: [90s toys, nostalgia toys]
+    subreddits: [nostalgia, 90s, toys]
+
+  - id: budget_recipes
+    name: Cabbage / budget recipes
+    wiki: [Cabbage, Lentil, Chickpea, Meal preparation]
+    keywords: [cheap recipes, cabbage recipes]
+    subreddits: [EatCheapAndHealthy, budgetfood, MealPrepSunday]
+
+  - id: geography_quiz
+    name: Geography quizzes
+    wiki: [GeoGuessr, Capital city, Gallery of sovereign state flags, List of sovereign states]
+    keywords: [geography quiz, flag quiz]
+    subreddits: [geography, geoguessr, MapPorn]
+
+  - id: pf_prices
+    name: Personal-finance prices (gold, fuel, rates)
+    wiki: [Gold as an investment, Price of oil, Repurchase agreement, Fixed deposit]
+    keywords: [gold price today, petrol price]
+    subreddits: [personalfinanceindia, IndiaInvestments, Gold]
+
+  - id: pet_care
+    name: Pet care data
+    wiki: [Dog breed, Dog food, Labrador Retriever, Cat food]
+    keywords: [dog breeds, pet care tips]
+    subreddits: [dogs, cats, DogAdvice]
+
+  - id: travel_visa
+    name: Travel visas / costs
+    wiki: [Henley Passport Index, Visa policy of the Schengen Area, Digital nomad, Travel visa]
+    keywords: [visa free countries, travel cost]
+    subreddits: [travel, solotravel, digitalnomad]
+
+  - id: baby_names
+    name: Baby names (open data)
+    wiki: [Given name, List of most popular given names, Naming ceremony]
+    keywords: [baby names, baby name ideas]
+    subreddits: [namenerds, BabyNames]
+
+  - id: etymology
+    name: Etymology / word origins
+    wiki: [Etymology, Loanword, Folk etymology]
+    keywords: [word origins, etymology]
+    subreddits: [etymology, linguistics]
+
+  - id: on_this_day
+    name: "\"On this day\" history"
+    wiki: [List of historical anniversaries, Anniversary, Almanac]
+    keywords: [on this day in history, today in history]
+    subreddits: [history, AskHistorians]
+
+  - id: air_quality
+    name: Air quality / weather records
+    wiki: [Air quality index, Heat wave, Air pollution in India]
+    keywords: [AQI today, heatwave]
+    subreddits: [weather, climate, delhi]
+
+  - id: earthquakes
+    name: Earthquakes / natural events
+    wiki: [Earthquake, Moment magnitude scale, Volcano]
+    keywords: [earthquake today, earthquake news]
+    subreddits: [Earthquakes, geology]
+
+  - id: rocket_launches
+    name: Rocket launches / space schedule
+    wiki: [SpaceX Starship, Rocket launch, Indian Space Research Organisation]
+    keywords: [rocket launch today, launch schedule]
+    subreddits: [spacex, ISRO, space]
+
+  - id: cricket_stats
+    name: Cricket stats (facts only)
+    wiki: [Indian Premier League, Cricket World Cup, Test cricket]
+    keywords: [cricket stats, IPL stats]
+    subreddits: [Cricket, IndiaCricket]
+
+  - id: japanese_micro
+    name: Language micro-lessons (Japanese)
+    wiki: [Japanese language, Kanji, Hiragana]
+    keywords: [learn japanese, japanese words]
+    subreddits: [LearnJapanese, languagelearning]
+
+  - id: houseplants
+    name: Houseplant care
+    wiki: [Houseplant, Monstera deliciosa, Epipremnum aureum]
+    keywords: [houseplant care, plant care tips]
+    subreddits: [houseplants, plantclinic]
+
+  - id: stoic_quotes
+    name: Stoic / public-domain quotes
+    wiki: [Stoicism, Marcus Aurelius, Meditations]
+    keywords: [stoic quotes, stoicism]
+    subreddits: [Stoicism]
+
+  - id: chess_puzzles
+    name: Chess puzzles (Lichess CC0 DB)
+    wiki: [Chess puzzle, Chess tactic, Magnus Carlsen]
+    keywords: [chess puzzle, chess tactics]
+    subreddits: [chess, chessbeginners]

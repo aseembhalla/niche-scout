@@ -1,0 +1,67 @@
+name: collect-and-score
+
+on:
+  workflow_dispatch:
+    inputs:
+      sources:
+        description: "Comma-separated: wiki,trends,youtube,reddit"
+        required: true
+        default: "wiki,youtube,reddit,trends"
+      niches:
+        description: "Optional comma-separated niche ids (blank = all)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: niche-scout
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Collect raw data
+        env:
+          SOURCES: ${{ inputs.sources }}
+          NICHES: ${{ inputs.niches }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+        run: python collect.py --sources "$SOURCES" --niches "$NICHES"
+
+      - name: Score and chart
+        run: python score.py
+
+      - name: Show fetch errors
+        if: always()
+        run: |
+          if [ -f data/raw/errors.csv ]; then cat data/raw/errors.csv; fi
+
+      - name: Commit results
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data charts
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "data: collect $SOURCES ($(date -u +%Y-%m-%d))"
+            git push
+          fi
+        env:
+          SOURCES: ${{ inputs.sources }}
