@@ -103,7 +103,7 @@ a { color: var(--accent); }
   <section id="ranking">
     <div class="kpis">
       <div class="kpi pick" style="grid-column: span 2">
-        <div class="l">Current #1 (provisional)</div>
+        <div class="l" id="pick-label">Current #1 (provisional)</div>
         <div class="name" id="pick-name">—</div>
         <div id="pick-chips"></div>
       </div>
@@ -353,10 +353,13 @@ M    money weight   = niche mid RPM ÷ median mid RPM  (1.0 while pending)</div>
   });
 
   let selected = null;
+  // Rank by opportunity once any niche has one; until then by demand growth.
+  let rankKey = "opportunity";
   function ranked() {
+    rankKey = D.scores.some((r) => isFinite(num(r.opportunity))) ? "opportunity" : "demand_growth";
     return D.scores
-      .filter((r) => isFinite(num(r.opportunity)))
-      .sort((a, b) => num(b.opportunity) - num(a.opportunity));
+      .filter((r) => isFinite(num(r[rankKey])))
+      .sort((a, b) => num(b[rankKey]) - num(a[rankKey]));
   }
 
   function drawRanking() {
@@ -366,21 +369,26 @@ M    money weight   = niche mid RPM ÷ median mid RPM  (1.0 while pending)</div>
     chips.replaceChildren();
     if (top) {
       pickName.textContent = top.niche;
+      document.getElementById("pick-label").textContent = rankKey === "opportunity"
+        ? "Current #1 by opportunity (provisional)"
+        : "Leading on demand growth (YouTube supply pending)";
       document.getElementById("k-opp").textContent = fmt.dec(top.opportunity);
       document.getElementById("k-dg").textContent = fmt.pctChange(top.demand_growth);
       document.getElementById("k-sg").textContent = fmt.pctChange(top.supply_growth);
       const add = (t, c) => { const s = document.createElement("span"); s.className = "chip " + c; s.textContent = t; s.style.marginRight = "6px"; chips.appendChild(s); };
       add(top.money_flag === "cited" ? "money: cited" : "money: estimate pending", top.money_flag === "cited" ? "ok" : "warn");
+      if (rankKey !== "opportunity") add("ranked by demand only until YouTube data lands", "warn");
       add("needs competitor check", "warn");
       selected = selected || top.niche_id;
     } else {
-      pickName.textContent = D.scores.length ? "Not enough data to score yet" : "Waiting for the first run";
+      pickName.textContent = D.scores.length ? "No demand data yet" : "Waiting for the first run";
       const s = document.createElement("span");
       s.className = "chip warn";
-      s.textContent = "scores need Wikipedia or Trends demand plus YouTube supply";
+      s.textContent = "needs Wikipedia or Google Trends data";
       chips.appendChild(s);
     }
-    const rows = D.scores.map((r) => ({ ...r }));
+    const order = ranked().map((r) => r.niche_id);
+    const rows = D.scores.map((r) => ({ ...r, rank: order.indexOf(r.niche_id) + 1 || "" }));
     table(document.getElementById("rank-table"), rows, [
       { key: "rank", label: "#", num: true, fmt: fmt.int },
       { key: "niche", label: "Niche" },
@@ -396,7 +404,7 @@ M    money weight   = niche mid RPM ÷ median mid RPM  (1.0 while pending)</div>
       { key: "yt_videos_prior_year", label: "YT year ago", num: true, fmt: fmt.compact },
       { key: "reddit_subscribers", label: "Reddit subs", num: true, fmt: fmt.compact },
     ], {
-      sortKey: "opportunity", dir: -1,
+      sortKey: "rank", dir: 1,
       empty: "No scores yet. They appear after the first workflow run.",
       selected: (r) => r.niche_id === selected,
       onRow: (r, tr) => {
