@@ -54,7 +54,7 @@ WIKI_PAGEVIEWS_API = (
     "en.wikipedia/all-access/user/{title}/monthly/{start}/{end}"
 )
 YT_API = "https://www.googleapis.com/youtube/v3"
-ALL_SOURCES = ("wiki", "trends", "youtube", "reddit")
+ALL_SOURCES = ("wiki", "trends", "trends_solo", "youtube", "reddit")
 
 T = TypeVar("T")
 
@@ -317,6 +317,29 @@ def _trends_call(func: Callable[[], T], label: str) -> T:
     return result
 
 
+def _trends_client(store: Store) -> Any:
+    """Create a pytrends client, or log an error and return ``None``.
+
+    The constructor fetches a Google cookie, so it can fail or be rate-limited.
+    Do not pass retries/backoff_factor: pytrends 4.9.2 breaks with urllib3>=2.
+    """
+    try:
+        from pytrends.request import TrendReq
+    except ImportError as exc:  # pragma: no cover - dependency missing
+        store.error("trends", "*", "pytrends", f"import failed: {exc}")
+        return None
+    try:
+        return with_retries(
+            partial(TrendReq, hl="en-US", tz=-330, timeout=(10, 30)),
+            attempts=4,
+            base_delay=60.0,
+            label="trends session",
+        )
+    except Exception as exc:  # noqa: BLE001
+        store.error("trends", "*", "session", str(exc))
+        return None
+
+
 def collect_trends(config: Config, store: Store) -> None:
     """Fetch Google Trends interest and rising queries for all keywords.
 
@@ -325,12 +348,6 @@ def collect_trends(config: Config, store: Store) -> None:
     (``value / mean(anchor)``). Growth ratios use each keyword's own series,
     which the batch scaling does not affect.
     """
-    try:
-        from pytrends.request import TrendReq
-    except ImportError as exc:  # pragma: no cover - dependency missing
-        store.error("trends", "*", "pytrends", f"import failed: {exc}")
-        return
-
     geo = str(config.settings.get("trends_geo", ""))
     anchor = str(config.settings.get("trends_anchor", "sudoku"))
     kw_to_niche: dict[str, str] = {}
@@ -340,17 +357,8 @@ def collect_trends(config: Config, store: Store) -> None:
     keywords = list(kw_to_niche)
     batches = [keywords[i : i + 4] for i in range(0, len(keywords), 4)]
 
-    # Do not pass retries/backoff_factor: pytrends 4.9.2 breaks with urllib3>=2.
-    # The constructor fetches a Google cookie, so it can fail or be rate-limited.
-    try:
-        client = with_retries(
-            partial(TrendReq, hl="en-US", tz=-330, timeout=(10, 30)),
-            attempts=4,
-            base_delay=60.0,
-            label="trends session",
-        )
-    except Exception as exc:  # noqa: BLE001
-        store.error("trends", "*", "session", str(exc))
+    client = _trends_client(store)
+    if client is None:
         return
     series_rows: list[dict[str, Any]] = []
     rising_rows: list[dict[str, Any]] = []
@@ -422,6 +430,53 @@ def collect_trends(config: Config, store: Store) -> None:
 
     store.write("trends_timeseries.csv", series_rows)
     store.write("trends_rising.csv", rising_rows)
+
+
+def collect_trends_solo(config: Config, store: Store) -> None:
+    """Fetch each keyword's 5-year Trends series on its own.
+
+    Alone in a request, a keyword is scaled to its own peak (100), so small
+    keywords keep full resolution. Use these series for growth ratios; use
+    the anchored batches in ``trends_timeseries.csv`` only for size.
+    """
+    client = _trends_client(store)
+    if client is None:
+        return
+    geo = str(config.settings.get("trends_geo", ""))
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for niche in config.niches:
+        for kw in niche.keywords:
+            if kw in seen:
+                continue
+            seen.add(kw)
+            try:
+
+                def fetch(word: str = kw) -> Any:
+                    client.build_payload([word], timeframe="today 5-y", geo=geo)
+                    return client.interest_over_time()
+
+                frame = _trends_call(fetch, f"trends solo {kw}")
+            except Exception as exc:  # noqa: BLE001
+                store.error("trends_solo", niche.id, kw, str(exc))
+                continue
+            if frame is None or frame.empty:
+                store.error("trends_solo", niche.id, kw, "empty (too little volume)")
+                continue
+            for date, rec in frame.iterrows():
+                rows.append(
+                    {
+                        "niche_id": niche.id,
+                        "keyword": kw,
+                        "date": date.date().isoformat(),
+                        "value": int(rec[kw]),
+                        "is_partial": bool(rec.get("isPartial", False)),
+                        "geo": geo or "WORLD",
+                        "source": "Google Trends via pytrends 4.9.2, keyword alone",
+                        "fetched_at": store.run_at,
+                    }
+                )
+    store.write("trends_solo.csv", rows)
 
 
 # --------------------------------------------------------------------------- #
@@ -708,6 +763,7 @@ def collect_reddit(config: Config, store: Store) -> None:
 COLLECTORS: dict[str, Callable[[Config, Store], None]] = {
     "wiki": collect_wiki,
     "trends": collect_trends,
+    "trends_solo": collect_trends_solo,
     "youtube": collect_youtube,
     "reddit": collect_reddit,
 }

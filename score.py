@@ -107,36 +107,88 @@ def wiki_metrics(wiki: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     return pd.DataFrame(rows), monthly
 
 
-def trends_metrics(trends: pd.DataFrame) -> pd.DataFrame:
-    """Return per-niche Google Trends growth and anchor-relative level."""
-    if trends.empty:
-        return pd.DataFrame()
-    five = trends[(trends.timeframe == "today 5-y") & (~trends.is_partial)]
-    rows = []
-    for (niche, kw), grp in five.groupby(["niche_id", "keyword"]):
-        grp = grp.sort_values("date")
-        last, prev = grp.value.iloc[-52:], grp.value.iloc[-104:-52]
-        anchor_mean = grp.anchor_value.iloc[-52:].mean()
-        rows.append(
-            {
-                "niche_id": niche,
-                "keyword": kw,
-                "yoy": last.mean() / prev.mean() if prev.mean() > 0 else np.nan,
-                "level_vs_anchor": (
-                    last.mean() / anchor_mean if anchor_mean > 0 else np.nan
-                ),
-                "low_resolution": bool(grp.value.max() < 5),
-            }
+MIN_BATCH_PEAK = 20  # below this, integer rounding swamps a batched series
+
+
+def _yoy(values: pd.Series) -> float:
+    """Mean of the last 52 weeks over the previous 52; NaN if undefined."""
+    last, prev = values.iloc[-52:], values.iloc[-104:-52]
+    if len(prev) < 52 or prev.mean() <= 0:
+        return float("nan")
+    return float(last.mean() / prev.mean())
+
+
+def keyword_trends(trends: pd.DataFrame, solo: pd.DataFrame) -> pd.DataFrame:
+    """Per-keyword Trends growth and size.
+
+    Growth comes from the keyword's own series (``trends_solo.csv``), where
+    the keyword is scaled to its own peak. Without one, the anchored batch
+    series is used only if it peaks at ``MIN_BATCH_PEAK`` or more. Size is
+    always the anchored level, ``mean(last 52 weeks) / mean(anchor)``.
+    """
+    rows: list[dict[str, object]] = []
+    five = pd.DataFrame()
+    if not trends.empty:
+        five = trends[(trends.timeframe == "today 5-y") & (~trends.is_partial)]
+    solo_ok = pd.DataFrame()
+    if not solo.empty:
+        solo_ok = solo[~solo.is_partial]
+    keys = set()
+    for frame in (five, solo_ok):
+        if not frame.empty:
+            keys |= set(
+                map(tuple, frame[["niche_id", "keyword"]].drop_duplicates().values)
+            )
+    for niche, kw in sorted(keys):
+        row: dict[str, object] = {"niche_id": niche, "keyword": kw}
+        batch = (
+            five[(five.niche_id == niche) & (five.keyword == kw)].sort_values("date")
+            if not five.empty
+            else pd.DataFrame()
         )
-    per_kw = pd.DataFrame(rows)
+        own = (
+            solo_ok[(solo_ok.niche_id == niche) & (solo_ok.keyword == kw)].sort_values(
+                "date"
+            )
+            if not solo_ok.empty
+            else pd.DataFrame()
+        )
+        if not batch.empty:
+            anchor = batch.anchor_value.iloc[-52:].mean()
+            row["level_vs_anchor"] = (
+                batch.value.iloc[-52:].mean() / anchor if anchor > 0 else np.nan
+            )
+            row["batch_peak"] = int(batch.value.max())
+        if not own.empty:
+            row["trends_yoy"] = _yoy(own.value)
+            row["mean_last_52w"] = float(own.value.iloc[-52:].mean())
+            row["mean_prev_52w"] = float(own.value.iloc[-104:-52].mean())
+            row["yoy_from"] = "own series"
+        elif not batch.empty and batch.value.max() >= MIN_BATCH_PEAK:
+            row["trends_yoy"] = _yoy(batch.value)
+            row["mean_last_52w"] = float(batch.value.iloc[-52:].mean())
+            row["mean_prev_52w"] = float(batch.value.iloc[-104:-52].mean())
+            row["yoy_from"] = "anchored batch"
+        else:
+            row["trends_yoy"] = np.nan
+            row["yoy_from"] = "too little volume"
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def trends_metrics(trends: pd.DataFrame, solo: pd.DataFrame) -> pd.DataFrame:
+    """Return per-niche Google Trends growth and anchor-relative level."""
+    per_kw = keyword_trends(trends, solo)
     if per_kw.empty:
         return per_kw
+    if "level_vs_anchor" not in per_kw:
+        per_kw["level_vs_anchor"] = np.nan
     return (
         per_kw.groupby("niche_id")
         .agg(
-            trends_yoy=("yoy", lambda s: geomean(list(s))),
+            trends_yoy=("trends_yoy", lambda s: geomean(list(s))),
             trends_level=("level_vs_anchor", "mean"),
-            trends_low_res_kw=("low_resolution", "sum"),
+            trends_kw_used=("trends_yoy", lambda s: int(s.notna().sum())),
         )
         .reset_index()
     )
@@ -227,7 +279,9 @@ def build_scores(
     wiki, monthly = wiki_metrics(read_csv(raw / "wiki_monthly.csv"))
     parts = [
         wiki,
-        trends_metrics(read_csv(raw / "trends_timeseries.csv")),
+        trends_metrics(
+            read_csv(raw / "trends_timeseries.csv"), read_csv(raw / "trends_solo.csv")
+        ),
         youtube_metrics(read_csv(raw / "youtube_windows.csv")),
         reddit_metrics(read_csv(raw / "reddit.csv")),
         money_metrics(read_csv(money_path)),

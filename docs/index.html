@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Niche Scout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+:root {
+  --bg: #f6f5f1; --panel: #ffffff; --fg: #1d1d1b; --muted: #6b6a64;
+  --line: #e2e0d8; --accent: #1f5f8b; --accent-soft: #d8e6f0;
+  --good: #2e7d4f; --bad: #b3412e; --warn: #a66a00; --chip: #efede6;
+  --series: #1f5f8b, #c2622d, #2e7d4f, #7a4ea3, #a66a00;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #151514; --panel: #1e1e1c; --fg: #ecebe6; --muted: #9c9a92;
+    --line: #34332f; --accent: #6fa8d6; --accent-soft: #23384a;
+    --good: #6cc191; --bad: #e07a63; --warn: #e0a640; --chip: #2a2926;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.5 "IBM Plex Sans", system-ui, sans-serif; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 64px; }
+header h1 { font-size: 28px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; }
+.sub { color: var(--muted); margin: 0; }
+.mono, td.num, .kpi .v { font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums; }
+nav.tabs { display: flex; gap: 4px; flex-wrap: wrap; margin: 24px 0 16px;
+  border-bottom: 1px solid var(--line); }
+nav.tabs button { background: none; border: 0; padding: 10px 14px; font: inherit;
+  color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; }
+nav.tabs button[aria-selected="true"] { color: var(--fg); border-color: var(--accent); font-weight: 500; }
+section[hidden] { display: none; }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 18px; min-width: 0; }
+.card h2 { font-size: 16px; font-weight: 600; margin: 0 0 2px; }
+.card .note { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+.span2 { grid-column: 1 / -1; }
+.kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); margin-bottom: 16px; }
+.kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.kpi .l { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.kpi .v { font-size: 24px; margin-top: 4px; }
+.kpi .s { color: var(--muted); font-size: 12px; }
+.pick { border-left: 4px solid var(--accent); }
+.pick .name { font-size: 22px; font-weight: 600; margin: 4px 0; }
+.chip { display: inline-block; background: var(--chip); border-radius: 999px; padding: 1px 9px;
+  font-size: 12px; color: var(--muted); }
+.chip.warn { color: var(--warn); }
+.chip.ok { color: var(--good); }
+.tbl-wrap { overflow: auto; max-height: 560px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+th { position: sticky; top: 0; background: var(--panel); font-weight: 500; color: var(--muted);
+  cursor: pointer; user-select: none; }
+th[aria-sort="ascending"]::after { content: " ▲"; font-size: 10px; }
+th[aria-sort="descending"]::after { content: " ▼"; font-size: 10px; }
+td.num, th.num { text-align: right; }
+tr.sel td { background: var(--accent-soft); }
+tbody tr { cursor: pointer; }
+.bar { display: inline-block; height: 8px; background: var(--accent); border-radius: 2px;
+  vertical-align: middle; margin-right: 6px; }
+.up { color: var(--good); } .down { color: var(--bad); }
+.formula { font-family: "IBM Plex Mono", monospace; font-size: 13px; background: var(--chip);
+  border-radius: 8px; padding: 12px 14px; overflow-x: auto; white-space: pre; }
+.calc { font-family: "IBM Plex Mono", monospace; font-size: 13px; line-height: 1.9; }
+.calc .k { color: var(--muted); }
+.chart { position: relative; min-height: 320px; }
+.tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 9px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.12);
+  opacity: 0; transition: opacity .1s; z-index: 2; white-space: nowrap; }
+.axis text { fill: var(--muted); font-size: 11px; }
+.axis path, .axis line { stroke: var(--line); }
+.grid-line { stroke: var(--line); }
+.empty { color: var(--muted); font-size: 13px; padding: 24px 0; text-align: center; }
+input.search { width: 100%; max-width: 280px; padding: 7px 10px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; font-size: 13px; margin-bottom: 10px; }
+footer { color: var(--muted); font-size: 12px; margin-top: 32px; }
+a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Niche Scout</h1>
+    <p class="sub">Which faceless, automatable content niche to start next — measured with free data, re-scored on every workflow run.
+      <span id="updated" class="chip mono">loading…</span></p>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="ranking" aria-selected="true">Ranking</button>
+    <button role="tab" data-tab="demand" aria-selected="false">Demand</button>
+    <button role="tab" data-tab="supply" aria-selected="false">Supply</button>
+    <button role="tab" data-tab="quality" aria-selected="false">Data quality</button>
+    <button role="tab" data-tab="method" aria-selected="false">Method</button>
+  </nav>
+
+  <!-- RANKING -->
+  <section id="ranking">
+    <div class="kpis">
+      <div class="kpi pick" style="grid-column: span 2">
+        <div class="l">Current #1 (provisional)</div>
+        <div class="name" id="pick-name">—</div>
+        <div id="pick-chips"></div>
+      </div>
+      <div class="kpi"><div class="l">Opportunity</div><div class="v" id="k-opp">—</div><div class="s">(G_d ÷ G_s) × √P_d × M</div></div>
+      <div class="kpi"><div class="l">Demand growth</div><div class="v" id="k-dg">—</div><div class="s">year over year</div></div>
+      <div class="kpi"><div class="l">Supply growth</div><div class="v" id="k-sg">—</div><div class="s">YouTube, 90 days vs year ago</div></div>
+    </div>
+
+    <div class="grid">
+      <div class="card span2">
+        <h2>All niches, ranked</h2>
+        <p class="note">Click a row to see how its score was calculated. Click a header to sort.</p>
+        <div class="tbl-wrap"><table id="rank-table"></table></div>
+      </div>
+      <div class="card">
+        <h2>How this score was calculated</h2>
+        <p class="note" id="calc-title">Select a niche in the table.</p>
+        <div class="calc" id="calc-body"></div>
+      </div>
+      <div class="card">
+        <h2>Opportunity vs money</h2>
+        <p class="note">Hollow points: money estimate still pending (weight 1.0). Opportunity on a log scale.</p>
+        <div class="chart" id="scatter"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DEMAND -->
+  <section id="demand" hidden>
+    <div class="grid">
+      <div class="card span2">
+        <h2>Demand trend — top 5 niches by opportunity</h2>
+        <p class="note">Wikipedia human pageviews, 12-month rolling average, first window = 100.</p>
+        <div class="chart" id="trend"></div>
+      </div>
+      <div class="card span2">
+        <h2>Google Trends by keyword</h2>
+        <p class="note">5-year weekly series. YoY = mean of last 52 weeks ÷ previous 52, from the keyword queried on its own. Level compares it with a shared anchor keyword.</p>
+        <input class="search" data-for="trends-table" placeholder="Filter keywords…">
+        <div class="tbl-wrap"><table id="trends-table"></table></div>
+      </div>
+      <div class="card span2">
+        <h2>Rising related searches</h2>
+        <p class="note">Top 5 rising queries per niche over the last 12 months ("Breakout" = growth over 5,000%).</p>
+        <input class="search" data-for="rising-table" placeholder="Filter…">
+        <div class="tbl-wrap"><table id="rising-table"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SUPPLY -->
+  <section id="supply" hidden>
+    <div class="grid">
+      <div class="card span2">
+        <h2>YouTube supply by keyword</h2>
+        <p class="note">Videos published in the last 90 days vs the same 90 days a year earlier. Counts are Google's estimates; views from the top 50 results.</p>
+        <input class="search" data-for="yt-table" placeholder="Filter keywords…">
+        <div class="tbl-wrap"><table id="yt-table"></table></div>
+      </div>
+      <div class="card span2">
+        <h2>Reddit communities</h2>
+        <p class="note">Subscribers and posting rate from the 100 newest posts.</p>
+        <input class="search" data-for="reddit-table" placeholder="Filter subreddits…">
+        <div class="tbl-wrap"><table id="reddit-table"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- QUALITY -->
+  <section id="quality" hidden>
+    <div class="grid">
+      <div class="card span2">
+        <h2>Failed fetches</h2>
+        <p class="note">Every request that failed. Its value is left blank in the scores, never set to zero.</p>
+        <div class="tbl-wrap"><table id="err-table"></table></div>
+      </div>
+      <div class="card span2">
+        <h2>Money estimates</h2>
+        <p class="note">RPM/CPM ranges from at least two cited sources per niche. These are estimates, not measured data.</p>
+        <div class="tbl-wrap"><table id="money-table"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- METHOD -->
+  <section id="method" hidden>
+    <div class="grid">
+      <div class="card span2">
+        <h2>Scoring formula</h2>
+        <div class="formula">opportunity = (G_d / G_s) × √P_d × M
+
+G_d  demand growth  = geomean(wiki_yoy, trends_yoy)
+       wiki_yoy     = Wikipedia views, last 12 complete months ÷ previous 12
+       trends_yoy   = geomean over keywords of (mean last 52 wks ÷ mean previous 52),
+                      each keyword queried alone so it keeps full 0–100 resolution
+G_s  supply growth  = geomean over keywords of (videos_recent + 1) ÷ (videos_prior_year + 1)
+P_d  demand size    = percentile rank of mean z( log wiki views, log Trends level, log Reddit subs )
+M    money weight   = niche mid RPM ÷ median mid RPM  (1.0 while pending)</div>
+      </div>
+      <div class="card">
+        <h2>Why this shape</h2>
+        <p>Demand divided by competition is the core of keyword opportunity scores such as the
+          <a href="https://seraphim-site.pages.dev/pages/seo-keyword-value-calculator.html">Keyword Effectiveness Index</a>.
+          The target is the high-demand, low-supply quadrant from
+          <a href="https://helpcenter.parrotanalytics.com/en/articles/6958184-demand-vs-supply">Parrot Analytics' demand vs supply matrix</a>.
+          The √P_d term damps tiny niches: <a href="https://bookbeam.io/updates/new-to-keyword-research-tool-keyword-analysis/">with no demand there is no opportunity</a>, however low the competition.</p>
+      </div>
+      <div class="card">
+        <h2>Known limits</h2>
+        <p>YouTube <code>totalResults</code> is an estimate, and YouTube stands in for still-image platforms that have no free count API.
+          Wikipedia pageviews <a href="https://arxiv.org/pdf/1509.02218">track search interest</a> but weight broad topics heavily.
+          Google Trends is read through pytrends, which is archived and often rate-limited.
+          Reddit gives a single snapshot, so posting rate but not its growth.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>Data: Wikimedia Pageviews API, Google Trends (pytrends), YouTube Data API v3, Reddit. Source code and raw CSVs:
+    <a href="https://github.com/aseembhalla/niche-scout">aseembhalla/niche-scout</a>.</footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const files = {
+    scores: "data/niche_scores.csv", wiki: "data/wiki_niche_monthly.csv",
+    trends: "data/trends_keywords.csv", rising: "data/trends_rising_top.csv",
+    yt: "data/youtube_keywords.csv", reddit: "data/reddit.csv",
+    errors: "data/errors.csv", money: "data/money_estimates.csv",
+  };
+  const num = (v) => (v === undefined || v === null || v === "" ? NaN : +v);
+  const fmt = {
+    int: (v) => (isFinite(num(v)) ? d3.format(",")(Math.round(num(v))) : "—"),
+    compact: (v) => (isFinite(num(v)) ? d3.format(".3~s")(num(v)).replace("G", "B") : "—"),
+    ratio: (v) => (isFinite(num(v)) ? "×" + d3.format(".2f")(num(v)) : "—"),
+    pctChange: (v) => (isFinite(num(v)) ? d3.format("+.0%")(num(v) - 1) : "—"),
+    pct: (v) => (isFinite(num(v)) ? d3.format(".0%")(num(v)) : "—"),
+    dec: (v) => (isFinite(num(v)) ? d3.format(".3~f")(num(v)) : "—"),
+    text: (v) => (v === undefined || v === null || v === "" ? "—" : String(v)),
+  };
+  const cls = (v) => (!isFinite(num(v)) ? "" : num(v) > 1 ? "up" : num(v) < 1 ? "down" : "");
+  const seriesColors = getComputedStyle(document.documentElement)
+    .getPropertyValue("--series").split(",").map((s) => s.trim());
+
+  // ---- tabs ----
+  document.querySelectorAll("nav.tabs button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("nav.tabs button").forEach((b) =>
+        b.setAttribute("aria-selected", String(b === btn)));
+      document.querySelectorAll("section").forEach((s) => (s.hidden = s.id !== btn.dataset.tab));
+      if (btn.dataset.tab === "demand") drawTrend();
+      if (btn.dataset.tab === "ranking") drawScatter();
+      history.replaceState(null, "", "#" + btn.dataset.tab);
+    });
+  });
+
+  // ---- generic sortable table ----
+  function table(el, rows, cols, opts = {}) {
+    el.replaceChildren();
+    if (!rows.length) {
+      const cap = el.createCaption();
+      cap.className = "empty";
+      cap.textContent = opts.empty || "No data yet — this source has not run or returned nothing.";
+      return;
+    }
+    let sortKey = opts.sortKey, dir = opts.dir || -1;
+    const thead = el.createTHead().insertRow();
+    const tbody = el.createTBody();
+    cols.forEach((c) => {
+      const th = document.createElement("th");
+      th.textContent = c.label;
+      if (c.num) th.className = "num";
+      th.addEventListener("click", () => {
+        dir = sortKey === c.key ? -dir : -1; sortKey = c.key; render();
+      });
+      thead.appendChild(th);
+    });
+    const max = {};
+    cols.filter((c) => c.bar).forEach((c) => (max[c.key] = d3.max(rows, (r) => num(r[c.key])) || 1));
+    function render() {
+      [...thead.children].forEach((th, i) => {
+        if (cols[i].key === sortKey) th.setAttribute("aria-sort", dir > 0 ? "ascending" : "descending");
+        else th.removeAttribute("aria-sort");
+      });
+      const sorted = [...rows];
+      if (sortKey) {
+        const c = cols.find((x) => x.key === sortKey);
+        sorted.sort((a, b) => {
+          const x = c.num ? num(a[sortKey]) : String(a[sortKey] ?? "");
+          const y = c.num ? num(b[sortKey]) : String(b[sortKey] ?? "");
+          if (c.num) {
+            if (!isFinite(x)) return 1;
+            if (!isFinite(y)) return -1;
+            return (x - y) * dir;
+          }
+          return x.localeCompare(y) * dir;
+        });
+      }
+      tbody.replaceChildren();
+      sorted.forEach((r) => {
+        const tr = tbody.insertRow();
+        if (opts.onRow) tr.addEventListener("click", () => opts.onRow(r, tr));
+        if (opts.selected && opts.selected(r)) tr.classList.add("sel");
+        cols.forEach((c) => {
+          const td = tr.insertCell();
+          if (c.num) td.className = "num";
+          if (c.bar && isFinite(num(r[c.key]))) {
+            const b = document.createElement("span");
+            b.className = "bar";
+            b.style.width = Math.max(2, (num(r[c.key]) / max[c.key]) * 60) + "px";
+            td.appendChild(b);
+          }
+          const span = document.createElement("span");
+          span.textContent = (c.fmt || fmt.text)(r[c.key]);
+          if (c.color) span.className = cls(r[c.key]);
+          td.appendChild(span);
+        });
+      });
+    }
+    render();
+  }
+
+  document.querySelectorAll("input.search").forEach((inp) => {
+    inp.addEventListener("input", () => {
+      const q = inp.value.toLowerCase();
+      document.querySelectorAll(`#${inp.dataset.for} tbody tr`).forEach((tr) => {
+        tr.hidden = q && !tr.textContent.toLowerCase().includes(q);
+      });
+    });
+  });
+
+  // ---- data ----
+  const D = {};
+  const load = (k) => d3.csv(files[k] + "?v=" + Date.now()).then((r) => (D[k] = r)).catch(() => (D[k] = []));
+
+  Promise.all(Object.keys(files).map(load)).then(() => {
+    const stamps = [...D.errors, ...D.yt, ...D.reddit].map((r) => r.fetched_at).filter(Boolean).sort();
+    const months = D.wiki.map((r) => r.month).sort();
+    document.getElementById("updated").textContent = stamps.length
+      ? "data fetched " + stamps[stamps.length - 1].slice(0, 16).replace("T", " ") + " UTC"
+      : months.length ? "wiki data to " + months[months.length - 1] : "no data yet";
+    drawRanking();
+    drawTables();
+    const tab = location.hash.slice(1);
+    const btn = document.querySelector(`nav.tabs button[data-tab="${tab}"]`);
+    if (btn) btn.click(); else drawScatter();
+  });
+
+  let selected = null;
+  function ranked() {
+    return D.scores
+      .filter((r) => isFinite(num(r.opportunity)))
+      .sort((a, b) => num(b.opportunity) - num(a.opportunity));
+  }
+
+  function drawRanking() {
+    const top = ranked()[0];
+    const pickName = document.getElementById("pick-name");
+    const chips = document.getElementById("pick-chips");
+    chips.replaceChildren();
+    if (top) {
+      pickName.textContent = top.niche;
+      document.getElementById("k-opp").textContent = fmt.dec(top.opportunity);
+      document.getElementById("k-dg").textContent = fmt.pctChange(top.demand_growth);
+      document.getElementById("k-sg").textContent = fmt.pctChange(top.supply_growth);
+      const add = (t, c) => { const s = document.createElement("span"); s.className = "chip " + c; s.textContent = t; s.style.marginRight = "6px"; chips.appendChild(s); };
+      add(top.money_flag === "cited" ? "money: cited" : "money: estimate pending", top.money_flag === "cited" ? "ok" : "warn");
+      add("needs competitor check", "warn");
+      selected = selected || top.niche_id;
+    } else {
+      pickName.textContent = D.scores.length ? "Not enough data to score yet" : "Waiting for the first run";
+      const s = document.createElement("span");
+      s.className = "chip warn";
+      s.textContent = "scores need Wikipedia or Trends demand plus YouTube supply";
+      chips.appendChild(s);
+    }
+    const rows = D.scores.map((r) => ({ ...r }));
+    table(document.getElementById("rank-table"), rows, [
+      { key: "rank", label: "#", num: true, fmt: fmt.int },
+      { key: "niche", label: "Niche" },
+      { key: "opportunity", label: "Opportunity", num: true, fmt: fmt.dec, bar: true },
+      { key: "demand_growth", label: "Demand growth", num: true, fmt: fmt.pctChange, color: true },
+      { key: "supply_growth", label: "Supply growth", num: true, fmt: fmt.pctChange },
+      { key: "demand_size_pct", label: "Demand size", num: true, fmt: fmt.pct },
+      { key: "money_weight", label: "Money", num: true, fmt: fmt.dec },
+      { key: "wiki_monthly_median_12m", label: "Wiki views/mo", num: true, fmt: fmt.compact },
+      { key: "wiki_yoy", label: "Wiki YoY", num: true, fmt: fmt.pctChange, color: true },
+      { key: "trends_yoy", label: "Trends YoY", num: true, fmt: fmt.pctChange, color: true },
+      { key: "yt_videos_recent", label: "YT videos 90d", num: true, fmt: fmt.compact },
+      { key: "yt_videos_prior_year", label: "YT year ago", num: true, fmt: fmt.compact },
+      { key: "reddit_subscribers", label: "Reddit subs", num: true, fmt: fmt.compact },
+    ], {
+      sortKey: "opportunity", dir: -1,
+      empty: "No scores yet. They appear after the first workflow run.",
+      selected: (r) => r.niche_id === selected,
+      onRow: (r, tr) => {
+        selected = r.niche_id;
+        tr.parentElement.querySelectorAll("tr").forEach((x) => x.classList.toggle("sel", x === tr));
+        drawCalc(); drawScatter();
+      },
+    });
+    drawCalc();
+  }
+
+  function drawCalc() {
+    const body = document.getElementById("calc-body");
+    const title = document.getElementById("calc-title");
+    body.replaceChildren();
+    const r = D.scores.find((x) => x.niche_id === selected);
+    if (!r) return;
+    title.textContent = r.niche;
+    const line = (k, v) => {
+      const div = document.createElement("div");
+      const a = document.createElement("span"); a.className = "k"; a.textContent = k + " ";
+      const b = document.createElement("span"); b.textContent = v;
+      div.append(a, b); body.appendChild(div);
+    };
+    const m = isFinite(num(r.money_weight)) ? num(r.money_weight) : 1;
+    line("wiki_yoy    =", fmt.dec(r.wiki_yoy));
+    line("trends_yoy  =", fmt.dec(r.trends_yoy));
+    line("G_d = geomean →", fmt.dec(r.demand_growth));
+    line("G_s (YouTube) =", fmt.dec(r.supply_growth) + "   (" + fmt.int(r.yt_videos_recent) + " ÷ " + fmt.int(r.yt_videos_prior_year) + ")");
+    line("P_d (size pct) =", fmt.dec(r.demand_size_pct) + "  → √ = " + fmt.dec(Math.sqrt(num(r.demand_size_pct))));
+    line("M (money)   =", fmt.dec(m) + (r.money_flag === "cited" ? "" : "  (pending)"));
+    line("opportunity =", fmt.dec(r.demand_growth) + " ÷ " + fmt.dec(r.supply_growth) + " × " +
+      fmt.dec(Math.sqrt(num(r.demand_size_pct))) + " × " + fmt.dec(m) + " = " + fmt.dec(r.opportunity));
+  }
+
+  function tooltip(box) {
+    const tip = document.createElement("div");
+    tip.className = "tip"; box.appendChild(tip);
+    return {
+      show(html, x, y) {
+        tip.replaceChildren(...html); tip.style.opacity = 1;
+        const w = tip.offsetWidth, bw = box.clientWidth;
+        tip.style.left = Math.min(Math.max(0, x + 12), bw - w) + "px";
+        tip.style.top = Math.max(0, y - 36) + "px";
+      },
+      hide() { tip.style.opacity = 0; },
+    };
+  }
+  const el = (tag, text, style) => { const e = document.createElement(tag); e.textContent = text; if (style) e.style.cssText = style; return e; };
+
+  function drawScatter() {
+    const box = document.getElementById("scatter");
+    box.replaceChildren();
+    const data = D.scores.filter((r) => num(r.opportunity) > 0);
+    if (!data.length) { box.appendChild(el("div", "Appears once niches have scores.")).className = "empty"; return; }
+    const W = box.clientWidth || 400, H = 320, m = { t: 12, r: 16, b: 40, l: 52 };
+    const x = d3.scaleLinear([0, d3.max(data, (r) => num(r.money_weight) || 1) * 1.15], [m.l, W - m.r]);
+    const y = d3.scaleLog(d3.extent(data, (r) => num(r.opportunity)), [H - m.b, m.t]).nice();
+    const svg = d3.select(box).append("svg").attr("width", "100%").attr("viewBox", `0 0 ${W} ${H}`);
+    svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(5));
+    svg.append("g").attr("class", "axis").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5, "~g"));
+    svg.append("text").attr("x", W - m.r).attr("y", H - 6).attr("text-anchor", "end").attr("fill", "var(--muted)").attr("font-size", 11).text("money weight →");
+    const tip = tooltip(box);
+    svg.selectAll("circle").data(data).join("circle")
+      .attr("cx", (r) => x(num(r.money_weight) || 1)).attr("cy", (r) => y(num(r.opportunity)))
+      .attr("r", (r) => (r.niche_id === selected ? 8 : 6))
+      .attr("fill", (r) => (r.money_flag === "cited" ? "var(--accent)" : "none"))
+      .attr("stroke", "var(--accent)").attr("stroke-width", 2)
+      .on("mousemove", (ev, r) => {
+        const [px, py] = d3.pointer(ev, box);
+        tip.show([el("div", r.niche, "font-weight:600"), el("div", "opportunity " + fmt.dec(r.opportunity)),
+          el("div", "money " + (r.money_flag === "cited" ? fmt.dec(r.money_weight) : "pending"))], px, py);
+      })
+      .on("mouseleave", () => tip.hide());
+    svg.selectAll("text.lbl").data(data.slice().sort((a, b) => num(b.opportunity) - num(a.opportunity)).slice(0, 6))
+      .join("text").attr("class", "lbl").attr("font-size", 11).attr("fill", "var(--fg)")
+      .attr("x", (r) => x(num(r.money_weight) || 1) + 9).attr("y", (r) => y(num(r.opportunity)) + 4)
+      .text((r) => r.niche_id);
+  }
+
+  function drawTrend() {
+    const box = document.getElementById("trend");
+    box.replaceChildren();
+    const top = ranked().slice(0, 5);
+    const ids = top.length ? top.map((r) => r.niche_id)
+      : [...new Set(D.wiki.map((r) => r.niche_id))].slice(0, 5);
+    const names = Object.fromEntries(D.scores.map((r) => [r.niche_id, r.niche]));
+    const series = ids.map((id) => {
+      const rows = D.wiki.filter((r) => r.niche_id === id).sort((a, b) => d3.ascending(a.month, b.month));
+      const vals = rows.map((r) => num(r.views));
+      const pts = [];
+      for (let i = 11; i < vals.length; i++) {
+        pts.push({ date: d3.utcParse("%Y-%m")(rows[i].month), v: d3.mean(vals.slice(i - 11, i + 1)) });
+      }
+      const base = pts.length ? pts[0].v : 1;
+      return { id, name: names[id] || id, pts: pts.map((p) => ({ ...p, idx: (p.v / base) * 100 })) };
+    }).filter((s) => s.pts.length);
+    if (!series.length) { box.appendChild(el("div", "Appears once Wikipedia data has loaded.")).className = "empty"; return; }
+    const W = box.clientWidth || 600, H = 340;
+    const all = series.flatMap((s) => s.pts);
+    const ml = 44;
+    const labelW = Math.min(170, W * 0.3);
+    const x = d3.scaleUtc(d3.extent(all, (p) => p.date), [ml, W - labelW]);
+    const y = d3.scaleLinear([0, d3.max(all, (p) => p.idx) * 1.05], [H - 30, 10]).nice();
+    const svg = d3.select(box).append("svg").attr("width", "100%").attr("viewBox", `0 0 ${W} ${H}`);
+    svg.append("g").selectAll("line").data(y.ticks(5)).join("line").attr("class", "grid-line")
+      .attr("x1", ml).attr("x2", W - labelW).attr("y1", y).attr("y2", y);
+    svg.append("line").attr("x1", ml).attr("x2", W - labelW).attr("y1", y(100)).attr("y2", y(100))
+      .attr("stroke", "var(--muted)").attr("stroke-dasharray", "3,3");
+    svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - 30})`).call(d3.axisBottom(x).ticks(Math.max(3, W / 120)));
+    svg.append("g").attr("class", "axis").attr("transform", `translate(${ml},0)`).call(d3.axisLeft(y).ticks(5));
+    const line = d3.line().x((p) => x(p.date)).y((p) => y(p.idx));
+    series.forEach((s, i) => {
+      const c = seriesColors[i % seriesColors.length];
+      svg.append("path").datum(s.pts).attr("d", line).attr("fill", "none").attr("stroke", c)
+        .attr("stroke-width", 2).attr("stroke-linejoin", "round").attr("stroke-linecap", "round");
+      s.color = c;
+    });
+    // end labels, nudged apart
+    const ends = series.map((s) => ({ s, y: y(s.pts[s.pts.length - 1].idx) })).sort((a, b) => a.y - b.y);
+    for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 14) ends[i].y = ends[i - 1].y + 14;
+    ends.forEach(({ s, y: yy }) => {
+      svg.append("text").attr("x", W - labelW + 6).attr("y", yy + 4).attr("font-size", 11).attr("fill", s.color)
+        .text(`${s.name.slice(0, 22)} ${Math.round(s.pts[s.pts.length - 1].idx)}`);
+    });
+    const tip = tooltip(box);
+    const rule = svg.append("line").attr("y1", 10).attr("y2", H - 30).attr("stroke", "var(--muted)").attr("opacity", 0);
+    const dates = series[0].pts.map((p) => p.date);
+    svg.append("rect").attr("x", ml).attr("y", 0).attr("width", W - labelW - ml).attr("height", H - 30)
+      .attr("fill", "transparent")
+      .on("mousemove", (ev) => {
+        const [px, py] = d3.pointer(ev);
+        const d = dates[Math.max(0, Math.min(dates.length - 1, d3.bisectCenter(dates, x.invert(px))))];
+        rule.attr("x1", x(d)).attr("x2", x(d)).attr("opacity", 0.5);
+        const rows = [el("div", d3.utcFormat("%b %Y")(d), "color:var(--muted)")];
+        series.forEach((s) => {
+          const p = s.pts.find((q) => +q.date === +d);
+          if (p) rows.push(el("div", `${s.name.slice(0, 26)}: ${Math.round(p.idx)}`, `color:${s.color}`));
+        });
+        tip.show(rows, x(d) * (box.clientWidth / W), py * (box.clientWidth / W));
+      })
+      .on("mouseleave", () => { tip.hide(); rule.attr("opacity", 0); });
+  }
+
+  function drawTables() {
+    const names = Object.fromEntries(D.scores.map((r) => [r.niche_id, r.niche]));
+    const withName = (rows) => rows.map((r) => ({ ...r, niche: names[r.niche_id] || r.niche_id }));
+    table(document.getElementById("trends-table"), withName(D.trends), [
+      { key: "niche", label: "Niche" }, { key: "keyword", label: "Keyword" },
+      { key: "trends_yoy", label: "YoY", num: true, fmt: fmt.pctChange, color: true },
+      { key: "mean_last_52w", label: "Mean last 52w", num: true, fmt: fmt.dec },
+      { key: "mean_prev_52w", label: "Mean prev 52w", num: true, fmt: fmt.dec },
+      { key: "level_vs_anchor", label: "Level vs anchor", num: true, fmt: fmt.dec, bar: true },
+      { key: "yoy_from", label: "Growth from" },
+      { key: "batch_peak", label: "Peak in batch", num: true, fmt: fmt.int },
+    ], { sortKey: "trends_yoy" });
+    table(document.getElementById("rising-table"), withName(D.rising), [
+      { key: "niche", label: "Niche" }, { key: "keyword", label: "From keyword" },
+      { key: "rising_query", label: "Rising query" }, { key: "rise", label: "Rise %", num: true },
+    ], { sortKey: "niche", dir: 1 });
+    const yt = {};
+    D.yt.forEach((r) => {
+      const k = r.niche_id + "|" + r.keyword;
+      yt[k] = yt[k] || { niche_id: r.niche_id, keyword: r.keyword };
+      if (r.window === "recent") {
+        Object.assign(yt[k], { recent: r.total_results_est, vpd: r.median_views_per_day,
+          vps: r.median_views_per_sub, views: r.median_views });
+      } else yt[k].prior = r.total_results_est;
+    });
+    const ytRows = Object.values(yt).map((r) => ({ ...r, ratio: (num(r.recent) + 1) / (num(r.prior) + 1) }));
+    table(document.getElementById("yt-table"), withName(ytRows), [
+      { key: "niche", label: "Niche" }, { key: "keyword", label: "Keyword" },
+      { key: "recent", label: "Videos 90d", num: true, fmt: fmt.int },
+      { key: "prior", label: "Same 90d last yr", num: true, fmt: fmt.int },
+      { key: "ratio", label: "Supply growth", num: true, fmt: fmt.pctChange },
+      { key: "views", label: "Median views", num: true, fmt: fmt.compact },
+      { key: "vpd", label: "Views/day", num: true, fmt: fmt.compact },
+      { key: "vps", label: "Views/sub", num: true, fmt: fmt.dec },
+    ], { sortKey: "ratio", dir: 1, empty: "No YouTube data yet." });
+    table(document.getElementById("reddit-table"), withName(D.reddit), [
+      { key: "niche", label: "Niche" }, { key: "subreddit", label: "Subreddit" },
+      { key: "subscribers", label: "Subscribers", num: true, fmt: fmt.int, bar: true },
+      { key: "posts_per_day", label: "Posts/day", num: true, fmt: fmt.dec },
+      { key: "access", label: "Access" },
+    ], { sortKey: "subscribers" });
+    table(document.getElementById("err-table"), withName(D.errors), [
+      { key: "source", label: "Source" }, { key: "niche", label: "Niche" },
+      { key: "item", label: "Item" }, { key: "error", label: "Error" },
+    ], { sortKey: "source", dir: 1, empty: "No failed fetches." });
+    const money = withName(D.money.filter((r) => r.low_usd !== "" && r.low_usd !== undefined));
+    table(document.getElementById("money-table"), money, [
+      { key: "niche", label: "Niche" }, { key: "platform", label: "Platform" },
+      { key: "metric", label: "Metric" },
+      { key: "low_usd", label: "Low $", num: true, fmt: fmt.dec },
+      { key: "high_usd", label: "High $", num: true, fmt: fmt.dec },
+      { key: "source_1", label: "Source 1" }, { key: "source_2", label: "Source 2" },
+    ], { empty: "Not filled yet — money estimates are researched after the first scores." });
+  }
+
+  let rt;
+  window.addEventListener("resize", () => {
+    clearTimeout(rt);
+    rt = setTimeout(() => { drawScatter(); if (!document.getElementById("demand").hidden) drawTrend(); }, 150);
+  });
+})();
+</script>
+</body>
+</html>

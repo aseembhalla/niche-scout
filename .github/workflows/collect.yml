@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       sources:
-        description: "Comma-separated: wiki,trends,youtube,reddit"
+        description: "Comma-separated: wiki,trends,trends_solo,youtube,reddit"
         required: true
-        default: "wiki,youtube,reddit,trends"
+        default: "wiki,youtube,reddit,trends,trends_solo"
       niches:
         description: "Optional comma-separated niche ids (blank = all)"
         required: false
@@ -25,6 +25,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main  # latest main when the run starts, not when it was queued
 
       - uses: actions/setup-python@v5
         with:
@@ -46,21 +48,35 @@ jobs:
       - name: Score and chart
         run: python score.py
 
+      - name: Export dashboard data
+        run: python export_dashboard.py
+
       - name: Show fetch errors
         if: always()
         run: |
           if [ -f data/raw/errors.csv ]; then cat data/raw/errors.csv; fi
+
+      - name: Keep a copy of the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: niche-scout-data-${{ github.run_id }}
+          path: |
+            data
+            docs/data
+          retention-days: 30
 
       - name: Commit results
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data charts
+          git add data charts docs
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
             git commit -m "data: collect $SOURCES ($(date -u +%Y-%m-%d))"
+            git pull --rebase --quiet -X theirs
             git push
           fi
         env:

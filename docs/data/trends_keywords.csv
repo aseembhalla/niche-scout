@@ -1,0 +1,41 @@
+niche_id,keyword,level_vs_anchor,batch_peak,trends_yoy,yoy_from,mean_last_52w,mean_prev_52w
+air_quality,AQI today,0.0569,19,,too little volume,,
+air_quality,heatwave,0.1672,91,2.336,anchored batch,11.3654,4.8654
+baby_names,baby name ideas,0.0037,1,,too little volume,,
+baby_names,baby names,0.2734,38,0.9712,anchored batch,22.7308,23.4038
+budget_recipes,cabbage recipes,0.028,6,,too little volume,,
+budget_recipes,cheap recipes,0.0361,8,,too little volume,,
+chess_puzzles,chess puzzle,0.0167,3,,too little volume,,
+chess_puzzles,chess tactics,0.0016,1,,too little volume,,
+cricket_stats,IPL stats,0.0551,25,2.9024,anchored batch,4.5769,1.5769
+cricket_stats,cricket stats,0.0386,14,,too little volume,,
+earthquakes,earthquake news,0.0614,22,1.0534,anchored batch,4.1731,3.9615
+earthquakes,earthquake today,0.1966,100,0.9254,anchored batch,13.3654,14.4423
+etymology,etymology,0.3886,48,1.5894,anchored batch,32.3077,20.3269
+etymology,word origins,0.012,1,,too little volume,,
+finance_charts,S&P 500 chart,0.0259,5,,too little volume,,
+finance_charts,stock market chart,0.0287,9,,too little volume,,
+geography_quiz,flag quiz,0.0123,28,1.0192,anchored batch,1.0192,1.0
+geography_quiz,geography quiz,0.012,2,,too little volume,,
+houseplants,houseplant care,0.0019,1,,too little volume,,
+houseplants,plant care tips,0.0005,1,,too little volume,,
+japanese_micro,japanese words,0.0382,5,,too little volume,,
+japanese_micro,learn japanese,0.0331,4,,too little volume,,
+night_sky,meteor shower tonight,0.0298,50,1.3492,anchored batch,1.6346,1.2115
+night_sky,moon phase,0.1737,100,0.9744,anchored batch,9.5192,9.7692
+nostalgia_toys,90s toys,0.0021,1,,too little volume,,
+nostalgia_toys,nostalgia toys,0.0,0,,too little volume,,
+on_this_day,on this day in history,0.012,1,,too little volume,,
+on_this_day,today in history,0.2119,68,2.4042,anchored batch,17.6154,7.3269
+perfume_layering,fragrance combinations,0.0,0,,too little volume,,
+perfume_layering,perfume layering,0.0016,1,,too little volume,,
+pet_care,dog breeds,0.2644,9,,too little volume,,
+pet_care,pet care tips,0.0282,3,,too little volume,,
+pf_prices,gold price today,2.1481,100,1.5712,anchored batch,33.75,21.4808
+pf_prices,petrol price,0.6291,31,2.7935,anchored batch,9.8846,3.5385
+rocket_launches,launch schedule,0.0733,24,1.5167,anchored batch,6.0962,4.0192
+rocket_launches,rocket launch today,0.0164,18,,too little volume,,
+stoic_quotes,stoic quotes,0.0,0,,too little volume,,
+stoic_quotes,stoicism,0.047,5,,too little volume,,
+travel_visa,travel cost,0.4164,87,2.1102,anchored batch,34.6154,16.4038
+travel_visa,visa free countries,0.059,10,,too little volume,,
