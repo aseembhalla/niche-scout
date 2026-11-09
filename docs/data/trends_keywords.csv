@@ -21,16 +21,16 @@ houseplants,houseplant care,0.0019,1,2.8303,51.3269,18.1346,own series
 houseplants,plant care tips,0.0005,1,2.3006,52.25,22.7115,own series
 japanese_micro,japanese words,0.0382,5,1.3542,63.3077,46.75,own series
 japanese_micro,learn japanese,0.0331,4,1.2911,64.2308,49.75,own series
-night_sky,meteor shower tonight,0.0298,50,1.3597,3.6346,2.6731,own series
+night_sky,meteor shower tonight,0.0298,50,,3.6346,2.6731,base year too sparse
 night_sky,moon phase,0.1737,100,0.9681,9.3462,9.6538,own series
 nostalgia_toys,90s toys,0.0021,1,1.2236,62.5,51.0769,own series
 nostalgia_toys,nostalgia toys,0.0,0,2.4108,36.9038,15.3077,own series
 on_this_day,on this day in history,0.012,1,1.2156,75.1538,61.8269,own series
 on_this_day,today in history,0.2119,68,2.3819,24.8269,10.4231,own series
-perfume_layering,fragrance combinations,0.0,0,3.6696,48.4808,13.2115,own series
+perfume_layering,fragrance combinations,0.0,0,,48.4808,13.2115,base year too sparse
 perfume_layering,perfume layering,0.0016,1,2.1727,39.1923,18.0385,own series
 pet_care,dog breeds,0.2644,9,1.3839,47.6923,34.4615,own series
-pet_care,pet care tips,0.0282,3,40.8333,14.1346,0.3462,own series
+pet_care,pet care tips,0.0282,3,,14.1346,0.3462,base year too sparse
 pf_prices,gold price today,2.1481,100,1.5571,33.5385,21.5385,own series
 pf_prices,petrol price,0.6291,31,2.807,30.7692,10.9615,own series
 rocket_launches,launch schedule,0.0733,24,1.5262,26.3269,17.25,own series

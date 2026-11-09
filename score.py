@@ -108,6 +108,7 @@ def wiki_metrics(wiki: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 MIN_BATCH_PEAK = 20  # below this, integer rounding swamps a batched series
+MAX_ZERO_WEEKS = 13  # base year with more zero weeks is too sparse for a ratio
 
 
 def _yoy(values: pd.Series) -> float:
@@ -159,7 +160,16 @@ def keyword_trends(trends: pd.DataFrame, solo: pd.DataFrame) -> pd.DataFrame:
                 batch.value.iloc[-52:].mean() / anchor if anchor > 0 else np.nan
             )
             row["batch_peak"] = int(batch.value.max())
-        if not own.empty:
+        sparse = (
+            not own.empty
+            and int((own.value.iloc[-104:-52] == 0).sum()) > MAX_ZERO_WEEKS
+        )
+        if sparse:
+            row["trends_yoy"] = np.nan
+            row["mean_last_52w"] = float(own.value.iloc[-52:].mean())
+            row["mean_prev_52w"] = float(own.value.iloc[-104:-52].mean())
+            row["yoy_from"] = "base year too sparse"
+        elif not own.empty:
             row["trends_yoy"] = _yoy(own.value)
             row["mean_last_52w"] = float(own.value.iloc[-52:].mean())
             row["mean_prev_52w"] = float(own.value.iloc[-104:-52].mean())
