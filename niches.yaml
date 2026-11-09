@@ -9,7 +9,7 @@ settings:
   wiki_start: "2016-01-01"
   trends_geo: ""            # "" = worldwide, "IN" = India
   trends_anchor: "sudoku"   # mid-volume anchor shared by every Trends batch
-  youtube_window_days: 90
+  youtube_window_days: 14  # 90 days hit the 1M totalResults cap for 33/40 keywords
   youtube_relevance_language: "en"
   min_channel_subs_for_ratio: 1000  # tiny channels inflate views/sub ratios
 

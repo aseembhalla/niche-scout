@@ -200,6 +200,7 @@ G_d  demand growth  = geomean(wiki_yoy, trends_yoy)
        trends_yoy   = geomean over keywords of (mean last 52 wks ÷ mean previous 52),
                       each keyword queried alone so it keeps full 0–100 resolution
 G_s  supply growth  = geomean over keywords of (videos_recent + 1) ÷ (videos_prior_year + 1)
+                      over 14-day windows; counts at YouTube's 1,000,000 cap are excluded
 P_d  demand size    = percentile rank of mean z( log wiki views, log Trends level, log Reddit subs )
 M    money weight   = niche mid RPM ÷ median mid RPM  (1.0 while pending)</div>
       </div>
@@ -355,8 +356,11 @@ M    money weight   = niche mid RPM ÷ median mid RPM  (1.0 while pending)</div>
   let selected = null;
   // Rank by opportunity once any niche has one; until then by demand growth.
   let rankKey = "opportunity";
+  const MIN_SCORED = 15;
   function ranked() {
-    rankKey = D.scores.some((r) => isFinite(num(r.opportunity))) ? "opportunity" : "demand_growth";
+    // Opportunity needs a real supply figure; rank by it only once most niches have one.
+    const scored = D.scores.filter((r) => isFinite(num(r.opportunity))).length;
+    rankKey = scored >= MIN_SCORED ? "opportunity" : "demand_growth";
     return D.scores
       .filter((r) => isFinite(num(r[rankKey])))
       .sort((a, b) => num(b[rankKey]) - num(a[rankKey]));
@@ -371,13 +375,13 @@ M    money weight   = niche mid RPM ÷ median mid RPM  (1.0 while pending)</div>
       pickName.textContent = top.niche;
       document.getElementById("pick-label").textContent = rankKey === "opportunity"
         ? "Current #1 by opportunity (provisional)"
-        : "Leading on demand growth (YouTube supply pending)";
+        : "Leading on demand growth (supply data incomplete)";
       document.getElementById("k-opp").textContent = fmt.dec(top.opportunity);
       document.getElementById("k-dg").textContent = fmt.pctChange(top.demand_growth);
       document.getElementById("k-sg").textContent = fmt.pctChange(top.supply_growth);
       const add = (t, c) => { const s = document.createElement("span"); s.className = "chip " + c; s.textContent = t; s.style.marginRight = "6px"; chips.appendChild(s); };
       add(top.money_flag === "cited" ? "money: cited" : "money: estimate pending", top.money_flag === "cited" ? "ok" : "warn");
-      if (rankKey !== "opportunity") add("ranked by demand only until YouTube data lands", "warn");
+      if (rankKey !== "opportunity") add("ranked by demand: too few niches have usable YouTube counts", "warn");
       add("needs competitor check", "warn");
       selected = selected || top.niche_id;
     } else {

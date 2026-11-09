@@ -108,6 +108,7 @@ def wiki_metrics(wiki: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 MIN_BATCH_PEAK = 20  # below this, integer rounding swamps a batched series
+YT_RESULTS_CAP = 1_000_000  # search.list never reports more than this
 MAX_ZERO_WEEKS = 13  # base year with more zero weeks is too sparse for a ratio
 
 
@@ -219,13 +220,21 @@ def youtube_metrics(yt: pd.DataFrame) -> pd.DataFrame:
     needed = {"total_results_est_recent", "total_results_est_prior_year"}
     if not needed.issubset(wide.columns):
         return pd.DataFrame()
+    # YouTube caps totalResults at 1,000,000: a capped count is a floor, not a
+    # measurement, so its ratio is excluded rather than read as "no growth".
+    capped = (wide.total_results_est_recent >= YT_RESULTS_CAP) | (
+        wide.total_results_est_prior_year >= YT_RESULTS_CAP
+    )
     wide["supply_ratio"] = (wide.total_results_est_recent + 1) / (
         wide.total_results_est_prior_year + 1
     )
+    wide.loc[capped, "supply_ratio"] = np.nan
+    wide["capped"] = capped
     agg = wide.groupby("niche_id").agg(
         yt_videos_recent=("total_results_est_recent", "sum"),
         yt_videos_prior_year=("total_results_est_prior_year", "sum"),
         supply_growth=("supply_ratio", lambda s: geomean(list(s))),
+        yt_kw_capped=("capped", "sum"),
     )
     for col in ("median_views_per_day_recent", "median_views_per_sub_recent"):
         if col in wide.columns:
