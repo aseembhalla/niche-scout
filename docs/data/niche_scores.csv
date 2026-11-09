@@ -1,21 +1,21 @@
-niche_id,niche,wiki_articles,wiki_last_month,wiki_monthly_median_12m,wiki_yoy,wiki_cagr_36m,wiki_cagr_full,trends_yoy,trends_level,trends_kw_used,demand_growth,demand_size_z,demand_size_pct,supply_growth,money_weight,money_flag,opportunity,rank
-perfume_layering,Perfume layering / scent stacking,4,2026-10,2.386e+04,0.4679,-0.4627,-0.04232,2.173,0.0008096,1,1.008,-1.741,0.05,,,pending,,
-finance_charts,Finance data chart packs,4,2026-10,1.341e+05,0.6293,-0.2081,0.01127,1.064,0.0273,2,0.8181,0.3199,0.7,,,pending,,
-night_sky,Night sky / astronomy,4,2026-10,5.839e+04,0.7606,-0.1458,-0.04879,0.9681,0.1018,1,0.8581,0.1261,0.5,,,pending,,
-nostalgia_toys,Nostalgia toys,4,2026-10,6.099e+04,0.7415,-0.1575,-0.005892,1.718,0.001053,2,1.129,-1.058,0.15,,,pending,,
-budget_recipes,Cabbage / budget recipes,4,2026-10,8.507e+04,0.7471,-0.2955,-0.05733,1.988,0.03204,2,1.219,0.06508,0.4,,,pending,,
-geography_quiz,Geography quizzes,4,2026-10,1.44e+05,0.862,-0.00401,0.02749,1.064,0.01214,2,0.9575,0.1511,0.55,,,pending,,
-pf_prices,"Personal-finance prices (gold, fuel, rates)",4,2026-10,2.1e+04,1.023,-0.1042,-0.1033,2.091,1.389,2,1.462,0.1518,0.6,,,pending,,
-pet_care,Pet care data,4,2026-10,8.17e+04,0.7522,-0.2282,-0.05813,1.384,0.1463,1,1.02,0.4416,0.8,,,pending,,
-travel_visa,Travel visas / costs,4,2026-10,6.601e+04,0.8205,-0.1783,0.04426,1.523,0.2377,2,1.118,0.4313,0.75,,,pending,,
-baby_names,Baby names (open data),3,2026-10,4.978e+04,0.8132,-0.1488,-0.08426,1.419,0.1386,2,1.074,0.1038,0.45,,,pending,,
-etymology,Etymology / word origins,3,2026-10,2.467e+04,0.8168,-0.1888,-0.05508,1.53,0.2003,2,1.118,-0.2566,0.25,,,pending,,
-on_this_day,"""On this day"" history",3,2026-10,3.658e+04,0.7537,-0.2488,0.01961,1.702,0.112,2,1.132,-0.1539,0.3,,,pending,,
-air_quality,Air quality / weather records,3,2026-10,2.922e+04,0.5897,-0.3285,-0.02841,2.13,0.112,2,1.121,-0.3003,0.2,,,pending,,
-earthquakes,Earthquakes / natural events,3,2026-10,8.646e+04,0.699,-0.3375,-0.1003,0.9877,0.129,2,0.8309,0.4453,0.85,,,pending,,
-rocket_launches,Rocket launches / space schedule,3,2026-10,1.079e+05,0.7826,-0.2687,0.1938,1.515,0.04488,2,1.089,0.3099,0.65,,,pending,,
-cricket_stats,Cricket stats (facts only),3,2026-10,3.24e+05,0.6173,-0.5113,0.09077,2.245,0.04684,2,1.177,1.039,1,,,pending,,
-japanese_micro,Language micro-lessons (Japanese),3,2026-10,1.693e+05,0.761,-0.2491,-0.01864,1.322,0.03562,2,1.003,0.5425,0.9,,,pending,,
-houseplants,Houseplant care,3,2026-10,4.092e+04,0.7441,-0.1872,0.02187,2.552,0.001157,2,1.378,-1.294,0.1,,,pending,,
-stoic_quotes,Stoic / public-domain quotes,3,2026-10,2.628e+05,0.6349,-0.2283,0.04047,1.016,0.02348,2,0.8031,0.719,0.95,,,pending,,
-chess_puzzles,Chess puzzles (Lichess CC0 DB),3,2026-10,1.202e+05,0.5861,-0.1414,0.08031,1.528,0.009137,2,0.9463,-0.04221,0.35,,,pending,,
+niche_id,niche,wiki_articles,wiki_last_month,wiki_monthly_median_12m,wiki_yoy,wiki_cagr_36m,wiki_cagr_full,trends_yoy,trends_level,trends_kw_used,yt_videos_recent,yt_videos_prior_year,supply_growth,yt_median_views_per_day_recent,yt_median_views_per_sub_recent,demand_growth,demand_size_z,demand_size_pct,money_weight,money_flag,opportunity,rank
+stoic_quotes,Stoic / public-domain quotes,3,2026-10,2.628e+05,0.6349,-0.2283,0.04047,1.016,0.02348,2,1158700,1437522,0.6023,573.4,0.6587,0.8031,0.719,0.95,,pending,1.3,1
+pf_prices,"Personal-finance prices (gold, fuel, rates)",4,2026-10,2.1e+04,1.023,-0.1042,-0.1033,2.091,1.389,2,2000000,2000000,1,4222,0.02575,1.462,0.1518,0.6,,pending,1.133,2
+cricket_stats,Cricket stats (facts only),3,2026-10,3.24e+05,0.6173,-0.5113,0.09077,2.245,0.04684,2,1874276,1710895,1.109,7882,2.742,1.177,1.039,1,,pending,1.062,3
+travel_visa,Travel visas / costs,4,2026-10,6.601e+04,0.8205,-0.1783,0.04426,1.523,0.2377,2,2000000,2000000,1,545.1,0.1809,1.118,0.4313,0.75,,pending,0.968,4
+japanese_micro,Language micro-lessons (Japanese),3,2026-10,1.693e+05,0.761,-0.2491,-0.01864,1.322,0.03562,2,2000000,2000000,1,701.4,1.128,1.003,0.5425,0.9,,pending,0.9516,5
+pet_care,Pet care data,4,2026-10,8.17e+04,0.7522,-0.2282,-0.05813,1.384,0.1463,1,2000000,2000000,1,1581,1.294,1.02,0.4416,0.8,,pending,0.9126,6
+rocket_launches,Rocket launches / space schedule,3,2026-10,1.079e+05,0.7826,-0.2687,0.1938,1.515,0.04488,2,2000000,2000000,1,414.5,0.295,1.089,0.3099,0.65,,pending,0.8779,7
+perfume_layering,Perfume layering / scent stacking,4,2026-10,2.386e+04,0.4679,-0.4627,-0.04232,2.173,0.0008096,1,495591,1746468,0.2859,327.2,0.3723,1.008,-1.741,0.05,,pending,0.7887,8
+budget_recipes,Cabbage / budget recipes,4,2026-10,8.507e+04,0.7471,-0.2955,-0.05733,1.988,0.03204,2,2000000,2000000,1,3202,0.589,1.219,0.06508,0.4,,pending,0.7708,9
+earthquakes,Earthquakes / natural events,3,2026-10,8.646e+04,0.699,-0.3375,-0.1003,0.9877,0.129,2,2000000,2000000,1,7411,0.0994,0.8309,0.4453,0.85,,pending,0.7661,10
+baby_names,Baby names (open data),3,2026-10,4.978e+04,0.8132,-0.1488,-0.08426,1.419,0.1386,2,2000000,2000000,1,2745,0.2741,1.074,0.1038,0.45,,pending,0.7206,11
+geography_quiz,Geography quizzes,4,2026-10,1.44e+05,0.862,-0.00401,0.02749,1.064,0.01214,2,2000000,2000000,1,1879,1.802,0.9575,0.1511,0.55,,pending,0.7101,12
+on_this_day,"""On this day"" history",3,2026-10,3.658e+04,0.7537,-0.2488,0.01961,1.702,0.112,2,2000000,2000000,1,54.5,0.04842,1.132,-0.1539,0.3,,pending,0.6203,13
+chess_puzzles,Chess puzzles (Lichess CC0 DB),3,2026-10,1.202e+05,0.5861,-0.1414,0.08031,1.528,0.009137,2,2000000,2000000,1,5701,3.057,0.9463,-0.04221,0.35,,pending,0.5598,14
+etymology,Etymology / word origins,3,2026-10,2.467e+04,0.8168,-0.1888,-0.05508,1.53,0.2003,2,2000000,2000000,1,437.1,0.5302,1.118,-0.2566,0.25,,pending,0.5589,15
+finance_charts,Finance data chart packs,4,2026-10,1.341e+05,0.6293,-0.2081,0.01127,1.064,0.0273,2,1434942,1208506,1.444,596.5,0.1685,0.8181,0.3199,0.7,,pending,0.4739,16
+houseplants,Houseplant care,3,2026-10,4.092e+04,0.7441,-0.1872,0.02187,2.552,0.001157,2,1811768,1907479,0.9458,1227,1.347,1.378,-1.294,0.1,,pending,0.4607,17
+air_quality,Air quality / weather records,3,2026-10,2.922e+04,0.5897,-0.3285,-0.02841,2.13,0.112,2,2000000,1821647,1.103,1773,0.1388,1.121,-0.3003,0.2,,pending,0.4543,18
+nostalgia_toys,Nostalgia toys,4,2026-10,6.099e+04,0.7415,-0.1575,-0.005892,1.718,0.001053,2,2000000,2000000,1,1563,0.6986,1.129,-1.058,0.15,,pending,0.4371,19
+night_sky,Night sky / astronomy,4,2026-10,5.839e+04,0.7606,-0.1458,-0.04879,0.9681,0.1018,1,1148855,1021777,2.614,156.2,0.6926,0.8581,0.1261,0.5,,pending,0.2321,20
