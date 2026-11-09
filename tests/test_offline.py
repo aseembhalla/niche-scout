@@ -195,6 +195,7 @@ def _write_fixtures(raw: Path) -> None:
             "total_results_est": c,
             "median_views_per_day": 10,
             "median_views_per_sub": 0.1,
+            "n_channels_ratio": 30,
         }
         for n, w, c in (
             ("a", "recent", 100),

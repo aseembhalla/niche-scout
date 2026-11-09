@@ -2,25 +2,26 @@
 
 Formula (every input is kept as a raw column in ``data/scores.csv``)::
 
-    demand_growth  G_d = geomean(wiki_yoy, trends_yoy)
-                     wiki_yoy   = Wikipedia views, last 12 complete months
-                                  / previous 12 months
-                     trends_yoy = Google Trends, mean of last 52 weeks
-                                  / mean of previous 52 weeks
-                                  (geomean across the niche's keywords)
-    supply_growth  G_s = geomean over keywords of
-                         (videos_recent + 1) / (videos_prior_year + 1)
-                         (YouTube search.list totalResults, matched windows)
-    demand_size    P_d = percentile rank (0-1] of the mean z-score of
-                         log(wiki monthly views), log(Trends level vs anchor),
-                         log(Reddit subscribers)
-    money          M   = niche mid RPM / median mid RPM of niches with data
-                         (1.0 and flagged when no cited estimate exists)
+    opportunity = (D / C) * sqrt(P) * M
 
-    opportunity = (G_d / G_s) * sqrt(P_d) * M
+    D  demand growth vs the median niche
+         = geomean(wiki_yoy / median wiki_yoy, trends_yoy / median trends_yoy)
+         wiki_yoy   = Wikipedia views, last 12 complete months / previous 12
+         trends_yoy = Google Trends, mean of last 52 weeks / previous 52,
+                      each keyword queried alone (geomean across keywords)
+    C  competition pressure vs the median niche
+         = geomean(supply_growth / median, median reach / reach), with a
+           missing supply_growth counted as typical (1.0)
+         supply_growth = YouTube videos, last 14 days / same 14 days a year
+                         earlier; counts at the 1,000,000 cap are excluded
+         reach         = median views per subscriber of recent videos from
+                         channels with >= 1,000 subscribers
+    P  demand size: percentile rank of the mean z-score of log Wikipedia
+       views, log Trends level vs anchor, log Reddit subscribers
+    M  money: niche mid RPM / median mid RPM (1.0 and flagged until cited)
 
-The square root damps small niches: high growth on tiny demand is not an
-opportunity, but it should not be ranked out entirely either.
+D and C are both 1.0 for a typical niche, so opportunity above sqrt(P) * M
+means growing faster, or facing less competition, than a typical niche.
 
 Usage::
 
@@ -108,6 +109,7 @@ def wiki_metrics(wiki: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 MIN_BATCH_PEAK = 20  # below this, integer rounding swamps a batched series
+MIN_REACH_CHANNELS = 20  # channels behind a keyword's views/subscriber median
 YT_RESULTS_CAP = 1_000_000  # search.list never reports more than this
 MAX_ZERO_WEEKS = 13  # base year with more zero weeks is too sparse for a ratio
 
@@ -239,6 +241,15 @@ def youtube_metrics(yt: pd.DataFrame) -> pd.DataFrame:
     for col in ("median_views_per_day_recent", "median_views_per_sub_recent"):
         if col in wide.columns:
             agg[f"yt_{col}"] = wide.groupby("niche_id")[col].median()
+    # Reach ratio (median views / subscribers of channels with >= 1,000 subs),
+    # kept only for keywords with enough channels behind the median.
+    recent = yt[yt.window == "recent"].copy()
+    if {"median_views_per_sub", "n_channels_ratio"}.issubset(recent.columns):
+        ok = recent[recent.n_channels_ratio >= MIN_REACH_CHANNELS]
+        agg["yt_reach"] = ok.groupby("niche_id").median_views_per_sub.apply(
+            lambda s: geomean(list(s))
+        )
+        agg["yt_reach_kw"] = ok.groupby("niche_id").size()
     return agg.reset_index()
 
 
@@ -313,8 +324,21 @@ def build_scores(
     def col(name: str) -> pd.Series:
         return df[name] if name in df else pd.Series(np.nan, index=df.index)
 
+    def rel(series: pd.Series) -> pd.Series:
+        """Ratio to the median niche: 1.0 = typical, >1 better than typical."""
+        return series / series.median()
+
+    # Baseline (Salganik, Bit by Bit): Wikipedia traffic is falling almost
+    # everywhere, so each source is compared with the median niche before
+    # combining. This also stops a niche missing one source being judged on
+    # the other source's general drift.
+    df["wiki_yoy_rel"] = rel(col("wiki_yoy"))
+    df["trends_yoy_rel"] = rel(col("trends_yoy"))
     df["demand_growth"] = [
         geomean([w, t]) for w, t in zip(col("wiki_yoy"), col("trends_yoy"), strict=True)
+    ]
+    df["demand_growth_rel"] = [
+        geomean([w, t]) for w, t in zip(df.wiki_yoy_rel, df.trends_yoy_rel, strict=True)
     ]
     size_parts = [
         zscore(np.log(col(c).where(col(c) > 0)))
@@ -322,12 +346,34 @@ def build_scores(
     ]
     df["demand_size_z"] = pd.concat(size_parts, axis=1).mean(axis=1)
     df["demand_size_pct"] = df.demand_size_z.rank(pct=True)
+
+    # Competition pressure C, from two supply signals relative to the median:
+    #   supply growth (more new videos than a year ago = more pressure) and
+    #   reach (views per subscriber; higher = audience outruns supply = less).
     df["supply_growth"] = col("supply_growth")
+    df["supply_growth_rel"] = rel(df.supply_growth)
+    df["yt_reach"] = col("yt_reach")
+    df["reach_rel"] = rel(df.yt_reach)
+    # A missing signal counts as typical (1.0), so each signal always carries
+    # the same weight instead of one standing in for both.
+    df["competition"] = [
+        geomean([g, 1 / r]) if r and r > 0 else np.nan
+        for g, r in zip(df.supply_growth_rel.fillna(1.0), df.reach_rel, strict=True)
+    ]
+    df["competition_basis"] = np.select(
+        [
+            df.supply_growth_rel.notna() & df.reach_rel.notna(),
+            df.reach_rel.notna(),
+            df.supply_growth_rel.notna(),
+        ],
+        ["growth+reach", "reach only", "growth only"],
+        default="none",
+    )
     df["money_weight"] = col("money_weight")
     df["money_flag"] = np.where(df.money_weight.isna(), "pending", "cited")
     weight = df.money_weight.fillna(1.0)
     df["opportunity"] = (
-        df.demand_growth / df.supply_growth * np.sqrt(df.demand_size_pct) * weight
+        df.demand_growth_rel / df.competition * np.sqrt(df.demand_size_pct) * weight
     )
     df["rank"] = df.opportunity.rank(ascending=False, method="min")
     return df.sort_values("rank"), monthly

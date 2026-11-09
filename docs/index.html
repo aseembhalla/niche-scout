@@ -107,9 +107,9 @@ a { color: var(--accent); }
         <div class="name" id="pick-name">—</div>
         <div id="pick-chips"></div>
       </div>
-      <div class="kpi"><div class="l">Opportunity</div><div class="v" id="k-opp">—</div><div class="s">(G_d ÷ G_s) × √P_d × M</div></div>
-      <div class="kpi"><div class="l">Demand growth</div><div class="v" id="k-dg">—</div><div class="s">year over year</div></div>
-      <div class="kpi"><div class="l">Supply growth</div><div class="v" id="k-sg">—</div><div class="s">YouTube, 90 days vs year ago</div></div>
+      <div class="kpi"><div class="l">Opportunity</div><div class="v" id="k-opp">—</div><div class="s">(D ÷ C) × √P × M</div></div>
+      <div class="kpi"><div class="l">Demand growth (D)</div><div class="v" id="k-dg">—</div><div class="s">vs the median niche</div></div>
+      <div class="kpi"><div class="l">Competition (C)</div><div class="v" id="k-sg">—</div><div class="s">vs the median niche; lower is better</div></div>
     </div>
 
     <div class="grid">
@@ -193,16 +193,23 @@ a { color: var(--accent); }
     <div class="grid">
       <div class="card span2">
         <h2>Scoring formula</h2>
-        <div class="formula">opportunity = (G_d / G_s) × √P_d × M
+        <div class="formula">opportunity = (D / C) × √P × M
 
-G_d  demand growth  = geomean(wiki_yoy, trends_yoy)
-       wiki_yoy     = Wikipedia views, last 12 complete months ÷ previous 12
-       trends_yoy   = geomean over keywords of (mean last 52 wks ÷ mean previous 52),
-                      each keyword queried alone so it keeps full 0–100 resolution
-G_s  supply growth  = geomean over keywords of (videos_recent + 1) ÷ (videos_prior_year + 1)
-                      over 14-day windows; counts at YouTube's 1,000,000 cap are excluded
-P_d  demand size    = percentile rank of mean z( log wiki views, log Trends level, log Reddit subs )
-M    money weight   = niche mid RPM ÷ median mid RPM  (1.0 while pending)</div>
+D  demand growth vs the median niche
+     = geomean(wiki_yoy ÷ median wiki_yoy, trends_yoy ÷ median trends_yoy)
+     wiki_yoy    = Wikipedia views, last 12 complete months ÷ previous 12
+     trends_yoy  = geomean over keywords of (mean last 52 wks ÷ previous 52),
+                   each keyword queried alone; blank if the base year is mostly zeros
+C  competition pressure vs the median niche (lower = less competition)
+     = geomean(supply_growth ÷ median, median reach ÷ reach)
+     supply_growth = YouTube videos, last 14 days ÷ same 14 days a year earlier;
+                     counts at the 1,000,000 cap excluded; missing counts as 1.0
+     reach         = median views ÷ subscribers for recent videos from channels
+                     with ≥ 1,000 subscribers (≥ 20 channels per keyword)
+P  demand size     = percentile rank of mean z( log wiki views, log Trends level, log Reddit subs )
+M  money weight    = niche mid RPM ÷ median mid RPM  (1.0 while pending)
+
+D and C equal 1.0 for a typical niche.</div>
       </div>
       <div class="card">
         <h2>Why this shape</h2>
@@ -210,7 +217,12 @@ M    money weight   = niche mid RPM ÷ median mid RPM  (1.0 while pending)</div>
           <a href="https://seraphim-site.pages.dev/pages/seo-keyword-value-calculator.html">Keyword Effectiveness Index</a>.
           The target is the high-demand, low-supply quadrant from
           <a href="https://helpcenter.parrotanalytics.com/en/articles/6958184-demand-vs-supply">Parrot Analytics' demand vs supply matrix</a>.
-          The √P_d term damps tiny niches: <a href="https://bookbeam.io/updates/new-to-keyword-research-tool-keyword-analysis/">with no demand there is no opportunity</a>, however low the competition.</p>
+          Each signal is compared with the median niche first, because a raw growth number
+          means little without a baseline (Google Flu Trends failed to beat a simple baseline:
+          <a href="https://www.bitbybitbook.com/en/observing-behavior/designs/forecasting/">Bit by Bit</a>).
+          Reach, views per subscriber, is the "outlier" signal creators use: audience outrunning supply
+          (<a href="https://outlierkit.com/resources/youtube-influencer-reach-ratio/">OutlierKit</a>).
+          The √P term damps tiny niches: <a href="https://bookbeam.io/updates/new-to-keyword-research-tool-keyword-analysis/">with no demand there is no opportunity</a>, however low the competition.</p>
       </div>
       <div class="card">
         <h2>Known limits</h2>
@@ -377,8 +389,8 @@ M    money weight   = niche mid RPM ÷ median mid RPM  (1.0 while pending)</div>
         ? "Current #1 by opportunity (provisional)"
         : "Leading on demand growth (supply data incomplete)";
       document.getElementById("k-opp").textContent = fmt.dec(top.opportunity);
-      document.getElementById("k-dg").textContent = fmt.pctChange(top.demand_growth);
-      document.getElementById("k-sg").textContent = fmt.pctChange(top.supply_growth);
+      document.getElementById("k-dg").textContent = fmt.ratio(top.demand_growth_rel);
+      document.getElementById("k-sg").textContent = fmt.ratio(top.competition);
       const add = (t, c) => { const s = document.createElement("span"); s.className = "chip " + c; s.textContent = t; s.style.marginRight = "6px"; chips.appendChild(s); };
       add(top.money_flag === "cited" ? "money: cited" : "money: estimate pending", top.money_flag === "cited" ? "ok" : "warn");
       if (rankKey !== "opportunity") add("ranked by demand: too few niches have usable YouTube counts", "warn");
@@ -397,8 +409,11 @@ M    money weight   = niche mid RPM ÷ median mid RPM  (1.0 while pending)</div>
       { key: "rank", label: "#", num: true, fmt: fmt.int },
       { key: "niche", label: "Niche" },
       { key: "opportunity", label: "Opportunity", num: true, fmt: fmt.dec, bar: true },
-      { key: "demand_growth", label: "Demand growth", num: true, fmt: fmt.pctChange, color: true },
-      { key: "supply_growth", label: "Supply growth", num: true, fmt: fmt.pctChange },
+      { key: "demand_growth_rel", label: "Demand vs median (D)", num: true, fmt: fmt.ratio, color: true },
+      { key: "competition", label: "Competition (C)", num: true, fmt: fmt.ratio },
+      { key: "competition_basis", label: "C from" },
+      { key: "yt_reach", label: "Views/sub", num: true, fmt: fmt.dec },
+      { key: "supply_growth", label: "YT supply growth", num: true, fmt: fmt.pctChange },
       { key: "demand_size_pct", label: "Demand size", num: true, fmt: fmt.pct },
       { key: "money_weight", label: "Money", num: true, fmt: fmt.dec },
       { key: "wiki_monthly_median_12m", label: "Wiki views/mo", num: true, fmt: fmt.compact },
@@ -436,11 +451,15 @@ M    money weight   = niche mid RPM ÷ median mid RPM  (1.0 while pending)</div>
     const m = isFinite(num(r.money_weight)) ? num(r.money_weight) : 1;
     line("wiki_yoy    =", fmt.dec(r.wiki_yoy));
     line("trends_yoy  =", fmt.dec(r.trends_yoy));
-    line("G_d = geomean →", fmt.dec(r.demand_growth));
-    line("G_s (YouTube) =", fmt.dec(r.supply_growth) + "   (" + fmt.int(r.yt_videos_recent) + " ÷ " + fmt.int(r.yt_videos_prior_year) + ")");
-    line("P_d (size pct) =", fmt.dec(r.demand_size_pct) + "  → √ = " + fmt.dec(Math.sqrt(num(r.demand_size_pct))));
-    line("M (money)   =", fmt.dec(m) + (r.money_flag === "cited" ? "" : "  (pending)"));
-    line("opportunity =", fmt.dec(r.demand_growth) + " ÷ " + fmt.dec(r.supply_growth) + " × " +
+    line("÷ median niche →", fmt.dec(r.wiki_yoy_rel) + ", " + fmt.dec(r.trends_yoy_rel));
+    line("D = geomean   =", fmt.dec(r.demand_growth_rel));
+    line("YT supply growth =", fmt.dec(r.supply_growth) + "   (" + fmt.int(r.yt_videos_recent) + " ÷ " + fmt.int(r.yt_videos_prior_year) + ", capped counts excluded)");
+    line("÷ median niche  =", fmt.dec(r.supply_growth_rel) + (isFinite(num(r.supply_growth_rel)) ? "" : "  (missing → 1.0)"));
+    line("reach (views/sub) =", fmt.dec(r.yt_reach) + "  ÷ median → " + fmt.dec(r.reach_rel));
+    line("C = geomean(growth, 1/reach) =", fmt.dec(r.competition));
+    line("P (size pct)  =", fmt.dec(r.demand_size_pct) + "  → √ = " + fmt.dec(Math.sqrt(num(r.demand_size_pct))));
+    line("M (money)     =", fmt.dec(m) + (r.money_flag === "cited" ? "" : "  (pending)"));
+    line("opportunity   =", fmt.dec(r.demand_growth_rel) + " ÷ " + fmt.dec(r.competition) + " × " +
       fmt.dec(Math.sqrt(num(r.demand_size_pct))) + " × " + fmt.dec(m) + " = " + fmt.dec(r.opportunity));
   }
 
