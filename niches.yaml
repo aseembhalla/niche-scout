@@ -9,7 +9,12 @@ settings:
   wiki_start: "2016-01-01"
   trends_geo: ""            # "" = worldwide, "IN" = India
   trends_anchor: "sudoku"   # mid-volume anchor shared by every Trends batch
-  youtube_window_days: 14  # 90 days hit the 1M totalResults cap for 33/40 keywords
+  youtube_window_days: 30   # recent sample for reach (views per subscriber)
+  youtube_prior_year: false # year-ago search counts are not comparable (see README)
+  panel_channels_per_niche: 20
+  panel_months: 24
+  panel_max_pages: 15       # 750 uploads per channel; deeper histories are flagged
+  daily_max_pages: 2        # 100 videos per niche per day; more is flagged saturated
   youtube_relevance_language: "en"
   min_channel_subs_for_ratio: 1000  # tiny channels inflate views/sub ratios
 

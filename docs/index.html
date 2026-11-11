@@ -158,8 +158,13 @@ a { color: var(--accent); }
   <section id="supply" hidden>
     <div class="grid">
       <div class="card span2">
-        <h2>YouTube supply by keyword</h2>
-        <p class="note">Videos published in the last 90 days vs the same 90 days a year earlier. Counts are Google's estimates; views from the top 50 results.</p>
+        <h2>Supply: uploads by each niche's leading channels</h2>
+        <p class="note">Real counts from each channel's upload list. Growth uses only channels older than two years whose full history was read. The daily log counts videos actually returned for the last 24 hours.</p>
+        <div class="tbl-wrap"><table id="panel-table"></table></div>
+      </div>
+      <div class="card span2">
+        <h2>YouTube reach by keyword</h2>
+        <p class="note">Top 50 recent videos per keyword. Reach = median views ÷ subscribers (channels with 1,000+ subscribers). *The search estimate is shown for reference only: YouTube caps it at 1,000,000 and it ignores date filters.</p>
         <input class="search" data-for="yt-table" placeholder="Filter keywords…">
         <div class="tbl-wrap"><table id="yt-table"></table></div>
       </div>
@@ -202,8 +207,9 @@ D  demand growth vs the median niche
                    each keyword queried alone; blank if the base year is mostly zeros
 C  competition pressure vs the median niche (lower = less competition)
      = geomean(supply_growth ÷ median, median reach ÷ reach)
-     supply_growth = YouTube videos, last 14 days ÷ same 14 days a year earlier;
-                     counts at the 1,000,000 cap excluded; missing counts as 1.0
+     supply_growth = uploads by each niche's ~20 leading channels, last 12 months
+                     ÷ previous 12, counted from their upload lists (missing = 1.0).
+                     YouTube search counts are not used: they cap at 1,000,000.
      reach         = median views ÷ subscribers for recent videos from channels
                      with ≥ 1,000 subscribers (≥ 20 channels per keyword)
 P  demand size     = percentile rank of mean z( log wiki views, log Trends level, log Reddit subs )
@@ -413,7 +419,10 @@ D and C equal 1.0 for a typical niche.</div>
       { key: "competition", label: "Competition (C)", num: true, fmt: fmt.ratio },
       { key: "competition_basis", label: "C from" },
       { key: "yt_reach", label: "Views/sub", num: true, fmt: fmt.dec },
-      { key: "supply_growth", label: "YT supply growth", num: true, fmt: fmt.pctChange },
+      { key: "supply_per_month", label: "Uploads/mo (panel)", num: true, fmt: fmt.compact },
+      { key: "supply_growth", label: "Uploads YoY (panel)", num: true, fmt: fmt.pctChange },
+      { key: "panel_channels", label: "Panel channels", num: true, fmt: fmt.int },
+      { key: "supply_per_day", label: "New videos/day", num: true, fmt: fmt.int },
       { key: "demand_size_pct", label: "Demand size", num: true, fmt: fmt.pct },
       { key: "money_weight", label: "Money", num: true, fmt: fmt.dec },
       { key: "wiki_monthly_median_12m", label: "Wiki views/mo", num: true, fmt: fmt.compact },
@@ -453,7 +462,7 @@ D and C equal 1.0 for a typical niche.</div>
     line("trends_yoy  =", fmt.dec(r.trends_yoy));
     line("÷ median niche →", fmt.dec(r.wiki_yoy_rel) + ", " + fmt.dec(r.trends_yoy_rel));
     line("D = geomean   =", fmt.dec(r.demand_growth_rel));
-    line("YT supply growth =", fmt.dec(r.supply_growth) + "   (" + fmt.int(r.yt_videos_recent) + " ÷ " + fmt.int(r.yt_videos_prior_year) + ", capped counts excluded)");
+    line("supply growth =", fmt.dec(r.supply_growth) + "   (" + fmt.int(r.uploads_last12) + " ÷ " + fmt.int(r.uploads_prev12) + " uploads, " + fmt.int(r.panel_channels) + " channels)");
     line("÷ median niche  =", fmt.dec(r.supply_growth_rel) + (isFinite(num(r.supply_growth_rel)) ? "" : "  (missing → 1.0)"));
     line("reach (views/sub) =", fmt.dec(r.yt_reach) + "  ÷ median → " + fmt.dec(r.reach_rel));
     line("C = geomean(growth, 1/reach) =", fmt.dec(r.competition));
@@ -588,25 +597,32 @@ D and C equal 1.0 for a typical niche.</div>
       { key: "niche", label: "Niche" }, { key: "keyword", label: "From keyword" },
       { key: "rising_query", label: "Rising query" }, { key: "rise", label: "Rise %", num: true },
     ], { sortKey: "niche", dir: 1 });
-    const yt = {};
-    D.yt.forEach((r) => {
-      const k = r.niche_id + "|" + r.keyword;
-      yt[k] = yt[k] || { niche_id: r.niche_id, keyword: r.keyword };
-      if (r.window === "recent") {
-        Object.assign(yt[k], { recent: r.total_results_est, vpd: r.median_views_per_day,
-          vps: r.median_views_per_sub, views: r.median_views });
-      } else yt[k].prior = r.total_results_est;
-    });
-    const ytRows = Object.values(yt).map((r) => ({ ...r, ratio: (num(r.recent) + 1) / (num(r.prior) + 1) }));
+    const ytRows = D.yt.filter((r) => r.window === "recent").map((r) => ({
+      niche_id: r.niche_id, keyword: r.keyword, n: r.n_sampled, chans: r.n_channels_ratio,
+      views: r.median_views, vpd: r.median_views_per_day, vps: r.median_views_per_sub,
+      est: r.total_results_est,
+    }));
     table(document.getElementById("yt-table"), withName(ytRows), [
       { key: "niche", label: "Niche" }, { key: "keyword", label: "Keyword" },
-      { key: "recent", label: "Videos 90d", num: true, fmt: fmt.int },
-      { key: "prior", label: "Same 90d last yr", num: true, fmt: fmt.int },
-      { key: "ratio", label: "Supply growth", num: true, fmt: fmt.pctChange },
+      { key: "n", label: "Videos sampled", num: true, fmt: fmt.int },
+      { key: "chans", label: "Channels ≥1k subs", num: true, fmt: fmt.int },
       { key: "views", label: "Median views", num: true, fmt: fmt.compact },
       { key: "vpd", label: "Views/day", num: true, fmt: fmt.compact },
-      { key: "vps", label: "Views/sub", num: true, fmt: fmt.dec },
-    ], { sortKey: "ratio", dir: 1, empty: "No YouTube data yet." });
+      { key: "vps", label: "Views/sub (reach)", num: true, fmt: fmt.dec, bar: true },
+      { key: "est", label: "Search estimate*", num: true, fmt: fmt.int },
+    ], { sortKey: "vps", dir: -1, empty: "No YouTube data yet." });
+    const panelRows = D.scores.filter((r) => isFinite(num(r.panel_channels_picked)));
+    table(document.getElementById("panel-table"), panelRows, [
+      { key: "niche", label: "Niche" },
+      { key: "panel_channels_picked", label: "Channels picked", num: true, fmt: fmt.int },
+      { key: "panel_channels", label: "Used for growth", num: true, fmt: fmt.int },
+      { key: "uploads_prev12", label: "Uploads, prior 12 mo", num: true, fmt: fmt.int },
+      { key: "uploads_last12", label: "Uploads, last 12 mo", num: true, fmt: fmt.int },
+      { key: "supply_per_month", label: "Per month", num: true, fmt: fmt.compact, bar: true },
+      { key: "supply_growth", label: "Growth", num: true, fmt: fmt.pctChange },
+      { key: "supply_per_day", label: "New videos/day (log)", num: true, fmt: fmt.int },
+      { key: "daily_days_logged", label: "Days logged", num: true, fmt: fmt.int },
+    ], { sortKey: "supply_growth", dir: 1, empty: "Channel upload histories arrive with the next Thursday run." });
     table(document.getElementById("reddit-table"), withName(D.reddit), [
       { key: "niche", label: "Niche" }, { key: "subreddit", label: "Subreddit" },
       { key: "subscribers", label: "Subscribers", num: true, fmt: fmt.int, bar: true },

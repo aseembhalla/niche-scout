@@ -54,7 +54,15 @@ WIKI_PAGEVIEWS_API = (
     "en.wikipedia/all-access/user/{title}/monthly/{start}/{end}"
 )
 YT_API = "https://www.googleapis.com/youtube/v3"
-ALL_SOURCES = ("wiki", "trends", "trends_solo", "youtube", "reddit")
+ALL_SOURCES = (
+    "wiki",
+    "trends",
+    "trends_solo",
+    "youtube",
+    "youtube_panel",
+    "youtube_daily",
+    "reddit",
+)
 
 T = TypeVar("T")
 
@@ -510,11 +518,12 @@ def _median(values: Sequence[float]) -> float | None:
 
 
 def collect_youtube(config: Config, store: Store) -> None:
-    """Count and sample videos per keyword for two matched time windows.
+    """Sample recent videos per keyword and measure their reach.
 
-    Windows: the last ``youtube_window_days`` days, and the same span one
-    year earlier (season-matched). Quota per keyword/window: 100 units for
-    search.list plus 1 each for videos.list and channels.list.
+    One search per keyword over the last ``youtube_window_days`` days; video
+    and channel statistics are then read by ID (videos.list, channels.list),
+    which audits found far more reliable than search. Quota per keyword: 100
+    units for search.list plus 1 each for videos.list and channels.list.
     """
     key = os.environ.get("YOUTUBE_API_KEY", "").strip()
     if not key:
@@ -526,13 +535,15 @@ def collect_youtube(config: Config, store: Store) -> None:
     lang = str(config.settings.get("youtube_relevance_language", "en"))
     min_subs = int(config.settings.get("min_channel_subs_for_ratio", 1000))
     now = dt.datetime.now(dt.UTC).replace(microsecond=0)
-    windows = {
-        "recent": (now - dt.timedelta(days=days), now),
-        "prior_year": (
+    windows = {"recent": (now - dt.timedelta(days=days), now)}
+    # Off by default: totalResults is capped at 1,000,000 and ignores the date
+    # filter, and older videos fade from search within 20-60 days (Efstratiou
+    # 2025; Rieder et al. 2025), so a year-ago window is not comparable.
+    if config.settings.get("youtube_prior_year", False):
+        windows["prior_year"] = (
             now - dt.timedelta(days=365 + days),
             now - dt.timedelta(days=365),
-        ),
-    }
+        )
 
     window_rows: list[dict[str, Any]] = []
     video_rows: list[dict[str, Any]] = []
@@ -667,6 +678,269 @@ def collect_youtube(config: Config, store: Store) -> None:
     store.write("youtube_videos.csv", video_rows)
 
 
+def _iso_z(when: dt.datetime) -> str:
+    """Format a UTC datetime the way the YouTube API expects."""
+    return (
+        when.astimezone(dt.UTC)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def _parse_ts(value: str) -> dt.datetime:
+    """Parse an ISO timestamp with a trailing Z."""
+    return dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def pick_panel_channels(
+    videos: list[dict[str, str]], per_niche: int, min_subs: int
+) -> dict[str, list[str]]:
+    """Choose the channels that matter most in each niche's search sample.
+
+    Channels are ranked by how many sampled videos they have in the niche
+    (across keywords), then by total views. Channels under ``min_subs``
+    subscribers or with hidden counts are skipped.
+    """
+    stats: dict[str, dict[str, list[float]]] = {}
+    for row in videos:
+        subs = row.get("channel_subs") or ""
+        try:
+            if float(subs) < min_subs:
+                continue
+        except ValueError:
+            continue
+        niche = stats.setdefault(row["niche_id"], {})
+        entry = niche.setdefault(row["channel_id"], [0.0, 0.0])
+        entry[0] += 1
+        entry[1] += float(row.get("views") or 0)
+    return {
+        niche: [
+            cid
+            for cid, _ in sorted(
+                channels.items(), key=lambda kv: (kv[1][0], kv[1][1]), reverse=True
+            )[:per_niche]
+        ]
+        for niche, channels in stats.items()
+    }
+
+
+def collect_youtube_panel(config: Config, store: Store) -> None:
+    """Count real monthly uploads by each niche's leading channels.
+
+    Channels come from ``youtube_videos.csv`` (run the ``youtube`` source
+    first). Each channel's uploads playlist is read with playlistItems.list,
+    an ID-based call, so counts are complete rather than estimated. Quota:
+    1 unit per 50 uploads, capped at ``panel_max_pages`` pages per channel.
+    """
+    key = os.environ.get("YOUTUBE_API_KEY", "").strip()
+    if not key:
+        store.error("youtube_panel", "*", "YOUTUBE_API_KEY", "not set")
+        return
+    sample = store.out_dir / "youtube_videos.csv"
+    if not sample.exists():
+        store.error("youtube_panel", "*", "youtube_videos.csv", "run youtube first")
+        return
+    with sample.open(newline="", encoding="utf-8") as handle:
+        videos = [r for r in csv.DictReader(handle) if r.get("window") == "recent"]
+
+    per_niche = int(config.settings.get("panel_channels_per_niche", 20))
+    months = int(config.settings.get("panel_months", 24))
+    max_pages = int(config.settings.get("panel_max_pages", 15))
+    min_subs = int(config.settings.get("min_channel_subs_for_ratio", 1000))
+    wanted = {n.id for n in config.niches}
+    panel = {
+        k: v
+        for k, v in pick_panel_channels(videos, per_niche, min_subs).items()
+        if k in wanted
+    }
+    session = make_session()
+    now = dt.datetime.now(dt.UTC)
+    first_month = (
+        (now.replace(day=1) - dt.timedelta(days=months * 31)).replace(day=1).date()
+    )
+
+    channel_rows: list[dict[str, Any]] = []
+    upload_rows: list[dict[str, Any]] = []
+    try:
+        all_ids = sorted({cid for ids in panel.values() for cid in ids})
+        info: dict[str, dict[str, Any]] = {}
+        for chunk in _chunks(all_ids):
+            data = _yt_get(
+                session,
+                "channels",
+                {
+                    "part": "snippet,statistics,contentDetails",
+                    "id": ",".join(chunk),
+                    "key": key,
+                },
+            )
+            for item in data.get("items", []):
+                info[item["id"]] = item
+
+        counts: dict[str, dict[str, int]] = {}
+        truncated: dict[str, bool] = {}
+        for cid in all_ids:
+            item = info.get(cid)
+            if item is None:
+                continue
+            uploads = item["contentDetails"]["relatedPlaylists"].get("uploads")
+            per_month: dict[str, int] = {}
+            token: str | None = None
+            done = False
+            pages = 0
+            while not done and pages < max_pages:
+                params: dict[str, Any] = {
+                    "part": "contentDetails",
+                    "playlistId": uploads,
+                    "maxResults": 50,
+                    "key": key,
+                }
+                if token:
+                    params["pageToken"] = token
+                try:
+                    data = _yt_get(session, "playlistItems", params)
+                except QuotaExceeded:
+                    raise
+                except Exception as exc:  # noqa: BLE001
+                    store.error("youtube_panel", "*", cid, str(exc))
+                    break
+                pages += 1
+                for entry in data.get("items", []):
+                    when = entry.get("contentDetails", {}).get("videoPublishedAt")
+                    if not when:
+                        continue
+                    day = _parse_ts(when).date()
+                    if day < first_month:
+                        done = True
+                        continue
+                    key_m = day.strftime("%Y-%m")
+                    per_month[key_m] = per_month.get(key_m, 0) + 1
+                token = data.get("nextPageToken")
+                if not token:
+                    done = True
+            counts[cid] = per_month
+            truncated[cid] = not done
+
+        for niche_id, ids in panel.items():
+            for cid in ids:
+                item = info.get(cid)
+                if item is None:
+                    store.error("youtube_panel", niche_id, cid, "channel not found")
+                    continue
+                st = item.get("statistics", {})
+                channel_rows.append(
+                    {
+                        "niche_id": niche_id,
+                        "channel_id": cid,
+                        "channel_title": item["snippet"].get("title"),
+                        "channel_created": item["snippet"].get("publishedAt", "")[:10],
+                        "country": item["snippet"].get("country"),
+                        "subscribers": (
+                            None
+                            if st.get("hiddenSubscriberCount")
+                            else st.get("subscriberCount")
+                        ),
+                        "video_count": st.get("videoCount"),
+                        "history_truncated": truncated.get(cid, False),
+                        "fetched_at": store.run_at,
+                    }
+                )
+                for month, n in sorted(counts.get(cid, {}).items()):
+                    upload_rows.append(
+                        {
+                            "niche_id": niche_id,
+                            "channel_id": cid,
+                            "month": month,
+                            "uploads": n,
+                            "source": "YouTube Data API v3 playlistItems.list",
+                            "fetched_at": store.run_at,
+                        }
+                    )
+    except QuotaExceeded as exc:
+        store.error("youtube_panel", "*", "quota", f"daily quota exhausted: {exc}")
+
+    store.write("youtube_panel_channels.csv", channel_rows)
+    store.write("youtube_panel_uploads.csv", upload_rows)
+
+
+def collect_youtube_daily(config: Config, store: Store) -> None:
+    """Log how many videos were actually returned for the last 24 hours.
+
+    Uses the first keyword of each niche, sorted by date, and counts the
+    videos returned (up to ``daily_max_pages`` x 50), not the totalResults
+    estimate. Rows are appended to ``youtube_daily.csv`` so a time series
+    builds up; growth is only read once 28+ days are logged.
+    """
+    key = os.environ.get("YOUTUBE_API_KEY", "").strip()
+    if not key:
+        store.error("youtube_daily", "*", "YOUTUBE_API_KEY", "not set")
+        return
+    session = make_session()
+    max_pages = int(config.settings.get("daily_max_pages", 2))
+    lang = str(config.settings.get("youtube_relevance_language", "en"))
+    until = dt.datetime.now(dt.UTC).replace(minute=0, second=0, microsecond=0)
+    since = until - dt.timedelta(days=1)
+    rows: list[dict[str, Any]] = []
+    try:
+        for niche in config.niches:
+            kw = niche.keywords[0]
+            returned = 0
+            token: str | None = None
+            pages = 0
+            while pages < max_pages:
+                params: dict[str, Any] = {
+                    "part": "id",
+                    "q": kw,
+                    "type": "video",
+                    "order": "date",
+                    "maxResults": 50,
+                    "publishedAfter": _iso_z(since),
+                    "publishedBefore": _iso_z(until),
+                    "relevanceLanguage": lang,
+                    "key": key,
+                }
+                if token:
+                    params["pageToken"] = token
+                try:
+                    data = _yt_get(session, "search", params)
+                except QuotaExceeded:
+                    raise
+                except Exception as exc:  # noqa: BLE001
+                    store.error("youtube_daily", niche.id, kw, str(exc))
+                    break
+                pages += 1
+                returned += len(data.get("items", []))
+                token = data.get("nextPageToken")
+                if not token:
+                    break
+            rows.append(
+                {
+                    "niche_id": niche.id,
+                    "keyword": kw,
+                    "window_start": _iso_z(since),
+                    "window_end": _iso_z(until),
+                    "videos_returned": returned,
+                    "saturated": bool(token) and pages >= max_pages,
+                    "pages": pages,
+                    "fetched_at": store.run_at,
+                }
+            )
+    except QuotaExceeded as exc:
+        store.error("youtube_daily", "*", "quota", f"daily quota exhausted: {exc}")
+
+    path = store.out_dir / "youtube_daily.csv"
+    old: list[dict[str, Any]] = []
+    if path.exists():
+        with path.open(newline="", encoding="utf-8") as handle:
+            old = [
+                r
+                for r in csv.DictReader(handle)
+                if r["window_end"] not in {x["window_end"] for x in rows}
+            ]
+    store.write("youtube_daily.csv", old + rows)
+
+
 # --------------------------------------------------------------------------- #
 # Reddit
 # --------------------------------------------------------------------------- #
@@ -765,6 +1039,8 @@ COLLECTORS: dict[str, Callable[[Config, Store], None]] = {
     "trends": collect_trends,
     "trends_solo": collect_trends_solo,
     "youtube": collect_youtube,
+    "youtube_panel": collect_youtube_panel,
+    "youtube_daily": collect_youtube_daily,
     "reddit": collect_reddit,
 }
 

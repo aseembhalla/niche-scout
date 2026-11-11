@@ -12,8 +12,10 @@ Formula (every input is kept as a raw column in ``data/scores.csv``)::
     C  competition pressure vs the median niche
          = geomean(supply_growth / median, median reach / reach), with a
            missing supply_growth counted as typical (1.0)
-         supply_growth = YouTube videos, last 14 days / same 14 days a year
-                         earlier; counts at the 1,000,000 cap are excluded
+         supply_growth = uploads by each niche's ~20 leading channels, last
+                         12 complete months / previous 12, read by ID from
+                         their uploads playlists (search counts are not used:
+                         totalResults is capped at 1,000,000)
          reach         = median views per subscriber of recent videos from
                          channels with >= 1,000 subscribers
     P  demand size: percentile rank of the mean z-score of log Wikipedia
@@ -235,7 +237,7 @@ def youtube_metrics(yt: pd.DataFrame) -> pd.DataFrame:
     agg = wide.groupby("niche_id").agg(
         yt_videos_recent=("total_results_est_recent", "sum"),
         yt_videos_prior_year=("total_results_est_prior_year", "sum"),
-        supply_growth=("supply_ratio", lambda s: geomean(list(s))),
+        yt_search_ratio=("supply_ratio", lambda s: geomean(list(s))),
         yt_kw_capped=("capped", "sum"),
     )
     for col in ("median_views_per_day_recent", "median_views_per_sub_recent"):
@@ -251,6 +253,69 @@ def youtube_metrics(yt: pd.DataFrame) -> pd.DataFrame:
         )
         agg["yt_reach_kw"] = ok.groupby("niche_id").size()
     return agg.reset_index()
+
+
+def panel_metrics(
+    channels: pd.DataFrame, uploads: pd.DataFrame, daily: pd.DataFrame
+) -> pd.DataFrame:
+    """Real supply measures from ID-based YouTube data.
+
+    supply_growth: uploads by the niche's leading channels in the last 12
+    complete months / the 12 before. Only channels created before that
+    24-month span, whose history was read in full, count, so new or
+    partly read channels cannot distort the ratio.
+    supply_per_month: those channels' average monthly uploads (last 12).
+    supply_per_day: median videos returned per day by the daily log.
+    """
+    out = pd.DataFrame()
+    if not channels.empty and not uploads.empty:
+        last_full = pd.Timestamp.now(tz="UTC").tz_localize(None).to_period("M") - 1
+        last12 = {str(last_full - i) for i in range(12)}
+        prev12 = {str(last_full - 12 - i) for i in range(12)}
+        start = (last_full - 23).to_timestamp().date().isoformat()
+        ok = channels[
+            (~channels.history_truncated.astype(str).str.lower().eq("true"))
+            & (channels.channel_created.astype(str) < start)
+        ]
+        up = uploads.merge(
+            ok[["niche_id", "channel_id"]], on=["niche_id", "channel_id"]
+        )
+        rows = []
+        for niche, grp in up.groupby("niche_id"):
+            a = grp[grp.month.isin(last12)].uploads.sum()
+            b = grp[grp.month.isin(prev12)].uploads.sum()
+            rows.append(
+                {
+                    "niche_id": niche,
+                    "panel_channels": int(grp.channel_id.nunique()),
+                    "uploads_last12": int(a),
+                    "uploads_prev12": int(b),
+                    "supply_growth": float(a / b) if b > 0 else np.nan,
+                    "supply_per_month": float(a / 12),
+                }
+            )
+        out = pd.DataFrame(rows)
+        picked = (
+            channels.groupby("niche_id")
+            .channel_id.nunique()
+            .rename("panel_channels_picked")
+        )
+        out = out.merge(picked.reset_index(), on="niche_id", how="outer")
+    if not daily.empty:
+        d = (
+            daily.groupby("niche_id")
+            .agg(
+                supply_per_day=("videos_returned", "median"),
+                daily_days_logged=("window_end", "nunique"),
+                daily_saturated=(
+                    "saturated",
+                    lambda s: bool(s.astype(str).eq("True").any()),
+                ),
+            )
+            .reset_index()
+        )
+        out = d if out.empty else out.merge(d, on="niche_id", how="outer")
+    return out
 
 
 def reddit_metrics(reddit: pd.DataFrame) -> pd.DataFrame:
@@ -313,6 +378,11 @@ def build_scores(
             read_csv(raw / "trends_timeseries.csv"), read_csv(raw / "trends_solo.csv")
         ),
         youtube_metrics(read_csv(raw / "youtube_windows.csv")),
+        panel_metrics(
+            read_csv(raw / "youtube_panel_channels.csv"),
+            read_csv(raw / "youtube_panel_uploads.csv"),
+            read_csv(raw / "youtube_daily.csv"),
+        ),
         reddit_metrics(read_csv(raw / "reddit.csv")),
         money_metrics(read_csv(money_path)),
     ]

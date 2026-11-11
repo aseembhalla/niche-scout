@@ -136,7 +136,7 @@ def test_youtube_window_metrics(
     store = collect.Store(tmp_path)
     collect.collect_youtube(_config(), store)
     rows = list(csv.DictReader((tmp_path / "youtube_windows.csv").open()))
-    assert len(rows) == 2
+    assert len(rows) == 1  # recent window only; year-ago search is off
     assert float(rows[0]["median_views"]) == 2000
     assert float(rows[0]["median_views_per_sub"]) == 1.0
 
@@ -218,8 +218,65 @@ def test_score_ranks_growing_low_supply_niche_first(tmp_path: Path) -> None:
     df, monthly = score.build_scores(raw, money, config)
     assert list(df.niche_id) == ["a", "b"]
     row_b = df.set_index("niche_id").loc["b"]
-    assert np.isclose(row_b.supply_growth, 301 / 101)
+    assert np.isclose(row_b.yt_search_ratio, 301 / 101)  # reference only
     assert row_b.money_flag == "pending"
     score.plot_demand(monthly, df.head(5), tmp_path / "d.png")
     score.plot_scatter(df, tmp_path / "s.png")
     assert (tmp_path / "d.png").exists() and (tmp_path / "s.png").exists()
+
+
+def test_pick_panel_channels_ranks_by_presence_then_views() -> None:
+    videos = [
+        {"niche_id": "a", "channel_id": "big", "channel_subs": "5000", "views": "900"},
+        {"niche_id": "a", "channel_id": "two", "channel_subs": "5000", "views": "10"},
+        {"niche_id": "a", "channel_id": "two", "channel_subs": "5000", "views": "10"},
+        {"niche_id": "a", "channel_id": "tiny", "channel_subs": "50", "views": "9e9"},
+        {"niche_id": "a", "channel_id": "hid", "channel_subs": "", "views": "9e9"},
+    ]
+    picked = collect.pick_panel_channels(videos, per_niche=5, min_subs=1000)
+    assert picked == {"a": ["two", "big"]}
+
+
+def test_panel_metrics_excludes_new_and_truncated_channels() -> None:
+    last = pd.Timestamp.now(tz="UTC").tz_localize(None).to_period("M") - 1
+    months = [str(last - i) for i in range(24)]
+    channels = pd.DataFrame(
+        [
+            {
+                "niche_id": "a",
+                "channel_id": "old",
+                "channel_created": "2010-01-01",
+                "history_truncated": False,
+            },
+            {
+                "niche_id": "a",
+                "channel_id": "new",
+                "channel_created": "2099-01-01",
+                "history_truncated": False,
+            },
+            {
+                "niche_id": "a",
+                "channel_id": "cut",
+                "channel_created": "2010-01-01",
+                "history_truncated": True,
+            },
+        ]
+    )
+    rows = []
+    for i, m in enumerate(months):
+        rows.append(
+            {
+                "niche_id": "a",
+                "channel_id": "old",
+                "month": m,
+                "uploads": 2 if i < 12 else 1,
+            }
+        )
+        rows.append({"niche_id": "a", "channel_id": "new", "month": m, "uploads": 99})
+        rows.append({"niche_id": "a", "channel_id": "cut", "month": m, "uploads": 99})
+    out = score.panel_metrics(channels, pd.DataFrame(rows), pd.DataFrame())
+    r = out.set_index("niche_id").loc["a"]
+    assert r.panel_channels == 1
+    assert r.uploads_last12 == 24 and r.uploads_prev12 == 12
+    assert np.isclose(r.supply_growth, 2.0)
+    assert np.isclose(r.supply_per_month, 2.0)

@@ -1,12 +1,17 @@
 name: collect-and-score
 
 on:
+  # YouTube quota (10,000 units) resets at 08:00 UTC; each job stays within it.
+  schedule:
+    - cron: "37 8 * * *"  # daily: new-video log (~2,000-4,000 units)
+    - cron: "51 8 * * 1"  # Mondays: web demand + YouTube reach sample (~4,100)
+    - cron: "51 8 * * 4"  # Thursdays: channel upload histories (up to ~6,000)
   workflow_dispatch:
     inputs:
       sources:
-        description: "Comma-separated: wiki,trends,trends_solo,youtube,reddit"
+        description: "Comma-separated: wiki,trends,trends_solo,youtube,youtube_panel,youtube_daily,reddit"
         required: true
-        default: "wiki,youtube,reddit,trends,trends_solo"
+        default: "wiki,trends,trends_solo,youtube"
       niches:
         description: "Optional comma-separated niche ids (blank = all)"
         required: false
@@ -36,9 +41,27 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Choose sources
+        env:
+          EVENT: ${{ github.event_name }}
+          CRON: ${{ github.event.schedule }}
+          INPUT_SOURCES: ${{ inputs.sources }}
+        run: |
+          if [ "$EVENT" = "schedule" ]; then
+            case "$CRON" in
+              "37 8 * * *") SOURCES="youtube_daily" ;;
+              "51 8 * * 1") SOURCES="wiki,trends,trends_solo,youtube" ;;
+              "51 8 * * 4") SOURCES="youtube_panel" ;;
+              *) echo "Unknown schedule $CRON"; exit 1 ;;
+            esac
+          else
+            SOURCES="$INPUT_SOURCES"
+          fi
+          echo "SOURCES=$SOURCES" >> "$GITHUB_ENV"
+          echo "Running sources: $SOURCES"
+
       - name: Collect raw data
         env:
-          SOURCES: ${{ inputs.sources }}
           NICHES: ${{ inputs.niches }}
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
@@ -79,5 +102,3 @@ jobs:
             git pull --rebase --quiet -X theirs
             git push
           fi
-        env:
-          SOURCES: ${{ inputs.sources }}

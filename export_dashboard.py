@@ -89,6 +89,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.data / "scores.csv": "niche_scores.csv",
         raw / "youtube_windows.csv": "youtube_keywords.csv",
         raw / "reddit.csv": "reddit.csv",
+        raw / "youtube_panel_channels.csv": "youtube_panel_channels.csv",
+        raw / "youtube_daily.csv": "youtube_daily.csv",
         raw / "errors.csv": "errors.csv",
         args.data / "money_estimates.csv": "money_estimates.csv",
     }
