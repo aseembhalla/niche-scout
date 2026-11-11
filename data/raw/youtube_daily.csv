@@ -1,0 +1,21 @@
+niche_id,keyword,window_start,window_end,videos_returned,saturated,pages,fetched_at
+perfume_layering,perfume layering,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,46,False,1,2026-11-11T16:32:05+00:00
+finance_charts,stock market chart,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,100,True,2,2026-11-11T16:32:05+00:00
+night_sky,meteor shower tonight,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,19,False,1,2026-11-11T16:32:05+00:00
+nostalgia_toys,90s toys,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,52,False,2,2026-11-11T16:32:05+00:00
+budget_recipes,cheap recipes,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,56,False,2,2026-11-11T16:32:05+00:00
+geography_quiz,geography quiz,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,100,True,2,2026-11-11T16:32:05+00:00
+pf_prices,gold price today,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,100,True,2,2026-11-11T16:32:05+00:00
+pet_care,dog breeds,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,100,True,2,2026-11-11T16:32:05+00:00
+travel_visa,visa free countries,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,28,False,1,2026-11-11T16:32:05+00:00
+baby_names,baby names,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,100,True,2,2026-11-11T16:32:05+00:00
+etymology,word origins,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,100,True,2,2026-11-11T16:32:05+00:00
+on_this_day,on this day in history,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,100,True,2,2026-11-11T16:32:05+00:00
+air_quality,AQI today,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,100,True,2,2026-11-11T16:32:05+00:00
+earthquakes,earthquake today,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,72,False,2,2026-11-11T16:32:05+00:00
+rocket_launches,rocket launch today,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,7,False,1,2026-11-11T16:32:05+00:00
+cricket_stats,cricket stats,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,100,True,2,2026-11-11T16:32:05+00:00
+japanese_micro,learn japanese,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,100,True,2,2026-11-11T16:32:05+00:00
+houseplants,houseplant care,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,100,True,2,2026-11-11T16:32:05+00:00
+stoic_quotes,stoic quotes,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,100,True,2,2026-11-11T16:32:05+00:00
+chess_puzzles,chess puzzle,2026-11-10T16:00:00Z,2026-11-11T16:00:00Z,100,True,2,2026-11-11T16:32:05+00:00
