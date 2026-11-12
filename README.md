@@ -14,16 +14,17 @@ by an opportunity score. Configuration lives in `niches.yaml`.
      <https://www.reddit.com/prefs/apps>.
 3. **Settings → Actions → General → Workflow permissions →** *Read and write*.
 
-## Schedule
+## Runs (on demand only)
 
-The workflow runs itself; the YouTube quota (10,000 units/day, reset 08:00 UTC)
-is split so jobs never compete:
+Nothing runs on a schedule. Start a run from **Actions → collect-and-score →
+Run workflow** and pick sources. Keep each day within the YouTube quota
+(10,000 units, reset 08:00 UTC):
 
-| When (UTC) | Sources | YouTube units |
-|---|---|---|
-| Daily 08:37 | `youtube_daily` — videos actually returned for the last 24 h | ~2,000–4,000 |
-| Monday 08:51 | `wiki,trends,trends_solo,youtube` — demand + reach sample | ~4,100 |
-| Thursday 08:51 | `youtube_panel` — upload histories of each niche's ~20 leading channels | up to ~6,000 |
+| Sources | YouTube units |
+|---|---|
+| `youtube_daily` — videos actually returned for the last 24 h | ~2,000–4,000 |
+| `wiki,trends,trends_solo,youtube` — demand + reach sample | ~4,100 |
+| `youtube_panel` — upload histories of each niche's ~20 leading channels | up to ~6,000 |
 
 Why not YouTube search counts: `totalResults` is capped at 1,000,000, ignores
 date filters, and older videos fade from search within 20–60 days (Efstratiou
